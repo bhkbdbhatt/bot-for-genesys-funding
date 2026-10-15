@@ -113,7 +113,7 @@ check("inline empty safe", render_inline("") == "")
 section("content engine")
 
 import content_engine as ce
-from models import ContentItem
+from models import ContentItem, PLATFORM_IDS
 from platforms import PLATFORMS
 
 content = {
@@ -206,8 +206,8 @@ check("tags clamped to devto limit", len(ce.normalise_tags(["a", "b", "c", "d", 
 check("tags clamped to hashnode limit", len(ce.normalise_tags(["a", "b", "c", "d", "e", "f"], "hashnode")) == 5)
 check("title clamped", ce.clamp_title("one two three four five", 3) == "one two three")
 
-check("registry complete", set(PLATFORMS) == {
-    "devto", "hashnode", "medium", "wordpress", "coderlegion", "devdojo", "webhook"})
+check("registry complete", set(PLATFORMS) == set(PLATFORM_IDS))
+check("legacy seven present", {"devto", "hashnode", "medium", "wordpress", "coderlegion", "devdojo", "webhook"} <= set(PLATFORMS))
 check("manual targets flagged", PLATFORMS["coderlegion"].kind == "manual" and PLATFORMS["devdojo"].kind == "manual")
 check("medium flagged legacy", PLATFORMS["medium"].legacy is True)
 
@@ -514,7 +514,7 @@ try:
     from publishers import check_all
 
     report = check_all(config)
-    check("check_all covers every platform", len(report) == 7, str(len(report)))
+    check("check_all covers every platform", len(report) == len(PLATFORM_IDS), str(len(report)))
     by_id = {entry["platform"]: entry for entry in report}
     check("devto reports missing token", by_id["devto"]["ready"] is False)
     check("devto reason names the env var", "DEVTO_API_KEY" in by_id["devto"]["reason"], by_id["devto"]["reason"])
@@ -546,7 +546,6 @@ from typing import List
 
 import content_engine as ce2
 from config_loader import Config
-from models import PLATFORM_IDS
 from platforms import PLATFORMS
 from publishers import get_publisher
 from webapp.service import content_data_from_config
@@ -603,6 +602,10 @@ try:
         ("WP_USERNAME", "fake-user"),
         ("WP_APP_PASSWORD", "fake-app-password"),
         ("WEBHOOK_URL", "https://example.invalid/hook"),
+        ("GHOST_ADMIN_KEY", "65d99cd9447d15d98a2fc264:deadbeefcafe"),
+        ("GHOST_ADMIN_URL", "https://blog.example.com/ghost"),
+        ("BLUESKY_HANDLE", "maintainer.bsky.social"),
+        ("BLUESKY_APP_PASSWORD", "fake-app-password-xxxx"),
     ):
         _os.environ[name] = value
 
@@ -725,7 +728,9 @@ try:
           devdojo.submit_url.endswith("/community/posts/write"), devdojo.submit_url)
 
     for name in ("DEVTO_API_KEY", "HASHNODE_PAT", "MEDIUM_TOKEN",
-                 "WP_USERNAME", "WP_APP_PASSWORD", "WEBHOOK_URL"):
+                 "WP_USERNAME", "WP_APP_PASSWORD", "WEBHOOK_URL",
+                 "GHOST_ADMIN_KEY", "GHOST_ADMIN_URL",
+                 "BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD"):
         _os.environ.pop(name, None)
 finally:
     shutil.rmtree(pw, ignore_errors=True)

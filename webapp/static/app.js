@@ -89,6 +89,22 @@ const PLATFORM_FIELDS = {
     ['platforms.webhook.method', 'HTTP method', 'text'],
     ['platforms.webhook.auth_header', 'Auth header', 'text'],
     ['platforms.webhook.auth_scheme', 'Auth scheme', 'text'],
+    ['platforms.webhook.secret_env', 'Signing secret env var', 'text'],
+    ['platforms.webhook.signing', 'Signing (auto / on / off)', 'text'],
+  ],
+  ghost: [
+    ['platforms.ghost.admin_url', 'Admin URL (site/ghost)', 'text'],
+    ['platforms.ghost.site_url', 'Public site URL', 'text'],
+    ['platforms.ghost.status', 'Status (published / draft)', 'text'],
+    ['platforms.ghost.api_version', 'API version', 'text'],
+  ],
+  bluesky: [
+    ['platforms.bluesky.handle', 'Handle (or BLUESKY_HANDLE)', 'text'],
+    ['platforms.bluesky.service', 'PDS service URL', 'text'],
+  ],
+  substack: [
+    ['platforms.substack.submit_url', 'Submit at', 'text'],
+    ['platforms.substack.guidelines_url', 'Guidelines', 'text'],
   ],
 };
 
@@ -132,6 +148,9 @@ const state = {
     authenticated: false,
     accountsExist: false,
     user: null,
+    role: '',
+    canWrite: true,
+    isAdmin: false,
     passwordMinLength: 12,
     totpDigits: 6,
     recoveryCodeCount: 10,
@@ -397,9 +416,10 @@ function renderAuth() {
 function updateWho() {
   const user = state.auth.user || {};
   const email = user.email || '-';
+  const role = state.auth.role ? ' (' + state.auth.role + ')' : '';
   const who = $('#who-email');
   if (who) {
-    who.textContent = email;
+    who.textContent = email + role;
     who.title = user.totp_enrolled ? email + ' - two-factor on' : email + ' - two-factor off';
   }
 }
@@ -413,6 +433,9 @@ async function loadAuthState() {
     state.auth.recoveryCodeCount = data.recovery_code_count || 0;
     state.auth.user = data.user || null;
     state.auth.authenticated = !!data.authenticated;
+    state.auth.role = data.role || (data.user && data.user.role) || '';
+    state.auth.canWrite = data.can_write !== false;
+    state.auth.isAdmin = !!data.is_admin;
   } catch (err) {
     state.auth.authenticated = false;
   }
@@ -597,7 +620,8 @@ function openSecurity() {
   const user = state.auth.user || {};
   const enrolled = !!user.totp_enrolled;
   openModal('<h2>Security</h2>' +
-    '<p class="hint">Signed in as <strong>' + esc(user.email || '-') + '</strong></p>' +
+    '<p class="hint">Signed in as <strong>' + esc(user.email || '-') + '</strong>' +
+    (state.auth.role ? ' (' + esc(state.auth.role) + ')' : '') + '</p>' +
     '<div class="card flat"><div class="flex between wrap mb">' +
     '<h3>Two-factor authentication</h3>' +
     (enrolled ? pill('enabled', 'good') : pill('not enabled', 'warn')) + '</div>' +

@@ -8,6 +8,7 @@ This keeps HTTP requests short and lets the UI stay responsive.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 import uuid
@@ -16,6 +17,25 @@ from typing import Any, Callable, Dict, List, Optional
 
 MAX_JOBS = 50
 MAX_LOG_LINES = 800
+
+# Tokens that must never survive into a job log the browser can read.
+_BEARER_RE = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]+")
+_ASSIGN_RE = re.compile(
+    r"(?i)\b([A-Za-z0-9_.-]*(?:key|token|secret|password|passwd|credential|pat|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:=]\s*(\"[^\"]*\"|'[^']*'|\S+)"
+)
+_REDACTED = "***"
+
+
+def redact(text: str) -> str:
+    """Scrub token-like values from a log line before it is stored.
+
+    Best-effort and deliberately conservative: it only rewrites ``Bearer <token>``
+    and ``name=value`` / ``name: value`` pairs whose key looks secret-bearing.
+    """
+    if not text:
+        return text
+    scrubbed = _BEARER_RE.sub(rf"\1{_REDACTED}", text)
+    return _ASSIGN_RE.sub(rf"\1={_REDACTED}", scrubbed)
 
 
 class JobCancelled(Exception):
@@ -43,7 +63,7 @@ class Job:
     # -- mutation (thread safe) ------------------------------------------- #
 
     def log(self, message: str) -> None:
-        text = str(message).rstrip()
+        text = redact(str(message).rstrip())
         if not text:
             return
         with self._lock:

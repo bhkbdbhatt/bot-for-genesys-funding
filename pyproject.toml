@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "genesys-plugin-sponsor-bot"
+version = "1.0.0"
+description = "Fundraising / developer-relations bot: GitHub sponsor outreach and content syndication for promoting an open-source Genesys Cloud plugin."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Bhargav Bhatt" }]
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+genesys-sponsor-bot = "main:main"
+
+[tool.setuptools]
+py-modules = [
+    "main",
+    "config_loader",
+    "models",
+    "state",
+    "tracker",
+    "content_store",
+    "platforms",
+    "discovery",
+    "prompt_engine",
+    "content_engine",
+    "llm",
+    "scheduler",
+    "promoter",
+    "logging_setup",
+]
+
+[tool.setuptools.packages.find]
+include = ["senders*", "publishers*", "webapp*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = [".venv", ".ruff_cache", "__pycache__"]
+
+[tool.ruff.lint]
+# Baseline per ARCHITECTURE.md: pyflakes errors + syntax-level pycodestyle.
+# UP (pyupgrade) is deliberately excluded - the codebase uses the typing.Dict /
+# typing.List style in older modules on purpose.
+select = ["F", "E9"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -79,6 +79,9 @@ PLATFORM_WORDPRESS = "wordpress"
 PLATFORM_CODERLEGION = "coderlegion"
 PLATFORM_DEVDOJO = "devdojo"
 PLATFORM_WEBHOOK = "webhook"
+PLATFORM_GHOST = "ghost"
+PLATFORM_BLUESKY = "bluesky"
+PLATFORM_SUBSTACK = "substack"
 
 PLATFORM_IDS = (
     PLATFORM_DEVTO,
@@ -88,10 +91,16 @@ PLATFORM_IDS = (
     PLATFORM_CODERLEGION,
     PLATFORM_DEVDOJO,
     PLATFORM_WEBHOOK,
+    PLATFORM_GHOST,
+    PLATFORM_BLUESKY,
+    PLATFORM_SUBSTACK,
 )
 
 OWNER_ORG = "Organization"
 OWNER_USER = "User"
+
+#: Discovery sources a campaign can scan, in default order.
+PROSPECT_SOURCES = ("github", "gitlab")
 
 _EMAIL_RE = re.compile(r"^[^@\s;,]+@[^@\s;,]+\.[A-Za-z]{2,}$")
 _MAX_EMAIL_LEN = 254
@@ -339,7 +348,13 @@ class Sponsor:
 
 @dataclass
 class DiscoveredSponsor:
-    """A candidate found by scanning GitHub topic repositories."""
+    """A candidate found by scanning topic repositories on a prospect source.
+
+    ``github_url`` is the candidate's primary profile URL. When the owner was
+    found on GitLab (or both), it holds the GitHub profile if one exists and
+    otherwise the GitLab profile; ``source`` records where it was found
+    (``github``, ``gitlab`` or ``github+gitlab``).
+    """
 
     owner_name: str
     owner_type: str = OWNER_USER
@@ -360,6 +375,7 @@ class DiscoveredSponsor:
     discovered_from: List[str] = field(default_factory=list)
     discovered_at: str = field(default_factory=now_iso)
     email_source: str = ""
+    source: str = "github"               # github | gitlab | github+gitlab
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -391,6 +407,7 @@ class DiscoveredSponsor:
             "location",
             "email_source",
             "discovered_at",
+            "source",
         ):
             data[text] = _as_str(data.get(text))
         for lst in ("topics", "discovered_from"):
@@ -411,6 +428,8 @@ class DiscoveredSponsor:
             notes = (
                 f"Discovered via topics: {', '.join(self.discovered_from) or 'n/a'}"
             )
+            if self.source and self.source != "github":
+                notes += f" | source: {self.source}"
             if self.top_repo:
                 notes += f" | top repo: {self.top_repo}"
             if self.email_source:

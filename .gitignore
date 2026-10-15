@@ -5,8 +5,10 @@ config.yaml
 !.env.example
 
 # Runtime output
-bot.log
-bot.log.*
+*.log
+*.log.*
+ui.log
+ui.log.*
 sponsors.json
 sponsors.json.corrupt
 discovered.json
@@ -16,6 +18,8 @@ forum_outbox/
 content_outbox/
 users.json
 users.json.*
+sessions.json
+sessions.json.*
 
 # Python
 __pycache__/

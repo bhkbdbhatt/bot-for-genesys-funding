@@ -214,6 +214,8 @@ def _platforms_block(enabled: Optional[List[str]] = None) -> Dict[str, Any]:
             "auth_header": "Authorization",
             "auth_scheme": "Bearer",
             "include_markdown": True,
+            "secret_env": "WEBHOOK_SECRET",
+            "signing": "auto",
         },
     }
 
@@ -271,6 +273,14 @@ def _github_block(topics: List[str]) -> Dict[str, Any]:
     }
 
 
+def _security_block() -> Dict[str, Any]:
+    return {
+        "secure_cookie": "auto",
+        "persistent_sessions": False,
+        "allowed_users": [],
+    }
+
+
 def generic_template() -> Dict[str, Any]:
     """A valid, neutral campaign the wizard can edit."""
     return {
@@ -313,6 +323,7 @@ def generic_template() -> Dict[str, Any]:
         "content": _content_block(),
         "platforms": _platforms_block(),
         "publishing": _publishing_block(),
+        "security": _security_block(),
         "sponsors": [],
         "rate_limits": _rate_limits_block(),
         "scheduler": _scheduler_block(),
@@ -519,6 +530,26 @@ class ProfileStore:
 
     def load_raw(self, pid: str) -> Dict[str, Any]:
         return self._read_raw(self.config_path(pid))
+
+    def allowed_users(self, pid: str) -> List[str]:
+        """Emails allowed to use this profile, from `security.allowed_users`.
+
+        Empty means "no restriction". Admin accounts bypass the list entirely
+        (see server.App), so an empty list never locks an admin out.
+        """
+        if not self.exists(pid):
+            return []
+        try:
+            raw = self.load_raw(pid)
+        except (OSError, yaml.YAMLError):
+            return []
+        security = raw.get("security") if isinstance(raw.get("security"), dict) else {}
+        allowed = security.get("allowed_users")
+        if isinstance(allowed, str):
+            allowed = [part.strip() for part in allowed.replace("\n", ",").split(",")]
+        if not isinstance(allowed, list):
+            return []
+        return [str(email).strip().lower() for email in allowed if str(email).strip()]
 
     def load_config(self, pid: str) -> Config:
         return Config.load(self.config_path(pid), create_from_example=False)

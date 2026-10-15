@@ -600,13 +600,6 @@ def build_store(config: Config) -> ContentStore:
     )
 
 
-def bootstrap(
-    config: Config, *, dry_run: Optional[bool] = None, batch_size: Optional[int] = None
-) -> Promoter:
-    """Build a Promoter wired to a fresh ContentStore."""
-    return Promoter(config, build_store(config), dry_run=dry_run, batch_size=batch_size)
-
-
 def describe_status(statuses: Optional[List[str]] = None) -> Dict[str, str]:
     """Status -> meaning, for `content list` and the UI."""
     from content_engine import status_help

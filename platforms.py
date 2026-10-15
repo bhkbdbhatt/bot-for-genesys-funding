@@ -285,6 +285,80 @@ PLATFORMS: Dict[str, PlatformSpec] = {
             "POST with {item, markdown, platforms}. Off by default."
         ),
     ),
+    "ghost": PlatformSpec(
+        id="ghost",
+        label="Ghost",
+        kind="api",
+        publisher_module="publishers.ghost",
+        content_format="html",
+        auth="bearer",
+        token_env="GHOST_ADMIN_KEY",
+        docs_url="https://ghost.org/docs/admin-api/",
+        token_help="Ghost Admin: Settings -> Integrations -> Add new integration; copy the Admin API key (id:secret) and set the Content API URL",
+        tag_limit=5,
+        max_title_words=14,
+        max_title_chars=191,
+        max_body_bytes=200_000,
+        min_body_words=120,
+        supports_canonical=True,
+        supports_tags=True,
+        supports_draft=True,
+        default_daily_limit=1,
+        cooldown_hours=24,
+        notes=(
+            "Admin API at <site>/ghost/api/admin/posts/. The Admin API key is "
+            "'<id>:<secret>'; the publisher signs a short-lived HS256 JWT per "
+            "request (stdlib hmac - no dependency). Set platforms.ghost."
+            "admin_url to your site's /ghost base URL."
+        ),
+    ),
+    "bluesky": PlatformSpec(
+        id="bluesky",
+        label="Bluesky",
+        kind="api",
+        publisher_module="publishers.bluesky",
+        content_format="markdown",
+        auth="bearer",
+        token_env="BLUESKY_APP_PASSWORD",
+        docs_url="https://docs.bsky.app/docs/api/com-atproto-server-create-session",
+        token_help="Bluesky Settings -> App passwords -> Add app password (never your main password)",
+        tag_limit=0,
+        max_title_words=8,
+        max_title_chars=300,
+        max_body_bytes=3000,
+        supports_canonical=True,
+        supports_tags=False,
+        supports_draft=False,
+        default_daily_limit=3,
+        cooldown_hours=1,
+        notes=(
+            "AT Protocol: createSession then com.atproto.repo.createRecord for "
+            "app.bsky.feed.post. Posts are short: the article is reduced to a "
+            "title, a one-line summary and the canonical link card "
+            "(app.bsky.embed.external). 300 grapheme limit."
+        ),
+    ),
+    "substack": PlatformSpec(
+        id="substack",
+        label="Substack",
+        kind="manual",
+        publisher_module="publishers.substack",
+        content_format="markdown",
+        auth="none",
+        submission_url="https://substack.com/publish",
+        docs_url="https://substack.com/how-it-works",
+        tag_limit=5,
+        max_title_words=14,
+        max_title_chars=140,
+        supports_tags=True,
+        default_daily_limit=1,
+        cooldown_hours=24,
+        notes=(
+            "No public publishing API. Posts are written in the Substack web "
+            "editor, so this target is handed off as ready-to-paste markdown "
+            "and only marked live once you confirm the published URL."
+        ),
+    ),
 }
 
 

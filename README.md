@@ -7,7 +7,8 @@ for each one, and delivers it over rate-limited email or forum channels.
 
 **Pipeline 2 - content syndication.** Writes one article and fans it out to
 developer communities: DEV (dev.to), Hashnode, Medium, WordPress
-(WordPress.com or self-hosted), CoderLegion and DevDojo, plus a generic webhook.
+(WordPress.com or self-hosted), Ghost, Bluesky, CoderLegion, DevDojo and
+Substack, plus a generic webhook.
 Platforms with a real publishing API are posted automatically; platforms that
 publish none get a paste-ready file and wait for you to confirm the live URL.
 
@@ -65,7 +66,7 @@ email/forum need their channel `enabled`, and syndication needs
 ### Outreach
 
 ```
-python main.py discover        # search GitHub topics for new prospects
+python main.py discover        # search GitHub (and GitLab) topics for new prospects
 python main.py add-sponsor     # add a prospect manually
 python main.py generate        # preview a message, send nothing
 python main.py run             # start the rate-limited scheduler
@@ -170,12 +171,15 @@ successful WordPress publish.
 | **WordPress**| `public-api.wordpress.com/rest/v1.1` or `/wp-json/wp/v2` | Application password (`$WP_USERNAME` + `$WP_APP_PASSWORD`) or OAuth (`$WPCOM_OAUTH_TOKEN`) |
 | **CoderLegion** | no API — manual submission                   | none; submit at [coderlegion.com/publish-with-us](https://coderlegion.com/publish-with-us) |
 | **DevDojo**  | no API — manual submission                     | none; submit at [devdojo.com/community/posts/write](https://devdojo.com/community/posts/write) |
-| **webhook**  | one JSON POST to a URL you control             | `$WEBHOOK_URL` plus an optional auth header    |
+| **Ghost**    | Admin API, `POST /ghost/api/admin/posts/`       | `$GHOST_ADMIN_KEY` (the `<id>:<secret>` from Settings → Integrations); the publisher signs a 5-minute HS256 JWT per request |
+| **Bluesky**  | AT Protocol, `com.atproto.repo.createRecord`   | `$BLUESKY_HANDLE` + `$BLUESKY_APP_PASSWORD` (an app password, **not** your main password) |
+| **Substack** | no API — manual submission                     | none; submit at [substack.com/publish](https://substack.com/publish) |
+| **webhook**  | one JSON POST to a URL you control             | `$WEBHOOK_URL` plus an optional auth header; set `$WEBHOOK_SECRET` to HMAC-sign every request |
 
 `python main.py platforms` is the authoritative readiness check: it prints what
 each target needs and where to get a credential. It is read-only and safe.
 
-**Why manual mode exists.** CoderLegion and DevDojo publish no API, and inventing
+**Why manual mode exists.** CoderLegion, DevDojo and Substack publish no API, and inventing
 an endpoint would either fail at 3am or — worse — look like it succeeded. So the
 bot does the part that can be automated (correct length, tags, project links,
 disclosure) and writes `content_outbox/<platform>/<id>.md`. The article stays
@@ -274,7 +278,9 @@ bootstrap one without a browser:
 
 ```powershell
 python main.py auth adduser --email you@example.com    # prompts for the password
-python main.py auth list                                # accounts + 2FA status
+python main.py auth adduser --email ops@example.com --role operator
+python main.py auth role --email ops@example.com --role viewer
+python main.py auth list                                # accounts, roles + 2FA status
 python main.py auth passwd --email you@example.com
 python main.py auth recovery --email you@example.com    # reissue recovery codes
 python main.py auth totp-disable --email you@example.com
@@ -282,6 +288,12 @@ python main.py auth remove --email you@example.com
 ```
 
 `--base-dir` selects where `users.json` lives (default: the current directory).
+Accounts have a **role**: `viewer` (read-only), `operator` (can run the pipelines)
+or `admin` (can also manage credentials and other accounts). A profile can name
+the accounts allowed to open it with `security.allowed_users`; admins bypass that
+list. Set `security.secure_cookie` (`auto`/`on`/`off`) to control the cookie's
+`Secure` flag and `security.persistent_sessions: true` to keep sessions across
+restarts (sealed to `sessions.json`).
 
 **Security model.** The server binds to loopback only and layers four
 independent checks: a `Host` allow-list (DNS-rebinding), a per-process
@@ -323,9 +335,12 @@ Two pipelines, one shared runtime.
 
 ### Outreach
 
-1. **Discover** (`discovery.py`) — queries the public GitHub REST API for repos
+1. **Discover** (`discovery.py`) — queries the public REST APIs of each enabled
+   *source* (`discovery.sources`, default `[github]`; add `gitlab`) for repos
    matching configured topics, groups them by owner, filters by stars/activity,
    and optionally scrapes the owner's public website for a contact email.
+   Sources share the `ProspectSource` contract; results from several sources
+   are merged into one deduplicated candidate list.
 2. **Track** (`tracker.py`) — keeps prospects, pipeline status, daily send
    counters and an event history in `sponsors.json`, written atomically.
 3. **Generate** (`prompt_engine.py`) — composes a channel-specific message from
@@ -365,6 +380,7 @@ All settings live in `config.yaml` (see the fully commented
 | -------------------- | --------------------------------------------------- |
 | `SMTP_PASSWORD`      | SMTP authentication                                 |
 | `GITHUB_TOKEN`       | Optional GitHub PAT, raises rate limits             |
+| `GITLAB_TOKEN`       | Optional GitLab PAT (`read_api`), raises GitLab limits |
 | `FORUM_API_KEY`      | Forum API bearer token (API mode only)              |
 | `DEVTO_API_KEY`      | DEV Community (dev.to) Forem API key                |
 | `HASHNODE_PAT`       | Hashnode GraphQL Personal Access Token              |
@@ -372,6 +388,11 @@ All settings live in `config.yaml` (see the fully commented
 | `WP_USERNAME` / `WP_APP_PASSWORD` | WordPress application-password auth         |
 | `WPCOM_OAUTH_TOKEN`  | WordPress.com OAuth2 bearer token                   |
 | `WEBHOOK_URL`        | Target URL for the generic webhook publisher        |
+| `WEBHOOK_SECRET`     | HMAC-SHA256 key; when set, webhook requests are signed |
+| `GHOST_ADMIN_KEY`    | Ghost Admin API key (`<id>:<secret>`)               |
+| `GHOST_ADMIN_URL`    | Ghost Admin base URL (e.g. `https://blog.example.com/ghost`) |
+| `BLUESKY_HANDLE`     | Bluesky handle (e.g. `you.bsky.social`)             |
+| `BLUESKY_APP_PASSWORD` | Bluesky app password (Settings → App passwords)   |
 | `OUTREACH_AUTH_SECRET` | Master key for web UI password peppering and sealed TOTP secrets |
 
 Key safety settings:
@@ -414,6 +435,18 @@ Key safety settings:
   credential first, so a missing key is a skip rather than an HTTP 401 in the log.
 - **manual** — no API exists; write the outbox file and report `queued`.
 
+**Webhook signing.** Set `WEBHOOK_SECRET` and every webhook POST carries
+`X-Timestamp`, `X-Signature: sha256=HMAC_SHA256(timestamp + "." + body)` and an
+`X-Idempotency-Key` (the article fingerprint). The receiver recomputes the HMAC
+over the raw body to prove the request is genuine and uses the key to drop a
+retried delivery that already landed. `platforms.webhook.signing` is `auto`
+(sign when the secret exists), `on` (refuse to send unsigned) or `off`.
+
+**Retries.** Transient failures — 429, 5xx and network errors — are retried with
+bounded exponential backoff (`publishing.retry.attempts`, default 3;
+`publishing.retry.backoff_seconds`, default 2), honouring `Retry-After` as a
+floor. Any other 4xx is terminal, so a bad token is never hammered.
+
 ## Ethics and compliance
 
 - `discovery.py` uses only the public GitHub API and owners' own published
@@ -427,6 +460,25 @@ Key safety settings:
 - Both pipelines are rate-limited independently, both persist after every
   outbound action, and both refuse to run without credentials you supplied.
 
+## Security
+
+This is a single-operator tool that acts on your behalf with credentials you
+supply, so the design leans on a few hard rules. To report a vulnerability, see
+[SECURITY.md](SECURITY.md).
+
+| Threat | Mitigation |
+| ------ | ---------- |
+| Credential leakage | Secrets are read only from environment variables and never written to disk, logs, outbox files or the web UI; log capture redacts token-like values |
+| Web UI exposure | Binds to loopback only, `Host` allow-list + per-process token, password + TOTP sign-in, server-side role gate (`admin` > `operator` > `viewer`), optional `Secure` cookie |
+| Session tampering | Sessions are random tokens, HMAC-sealed when persisted; tampering is detected and the session is dropped |
+| Social/reputation harm | Rate limits and per-target cooldowns, a quality gate, required maintainer disclosure, human approval before publication, and no fabricated metrics |
+| Data loss on crash | Every ledger write is atomic (`fsync` + `os.replace`) and persisted before the next outbound action |
+| Webhook spoofing / replays | Optional HMAC-SHA256 signing (`X-Signature`, `X-Timestamp`) and a per-article idempotency key |
+| Account lockout / bans | Bounded exponential retries with `Retry-After`; other 4xx are terminal, never hammered |
+
+The rationale behind each rule is documented in `ARCHITECTURE.md`
+(§ *Cross-cutting invariants*).
+
 ## Files
 
 | Path                       | Purpose                                     |
@@ -438,7 +490,7 @@ Key safety settings:
 | `tracker.py`               | Outreach ledger (`sponsors.json`)           |
 | `content_store.py`         | Syndication ledger (`content.json`)         |
 | `platforms.py`             | Registry of syndication targets             |
-| `discovery.py`             | GitHub prospecting and email scraping       |
+| `discovery.py`             | Pluggable prospecting (GitHub/GitLab) + email scraping |
 | `prompt_engine.py`         | Outreach message composition                 |
 | `content_engine.py`        | Article composition + quality gate          |
 | `llm.py`                   | Optional subprocess LLM renderer            |
@@ -454,15 +506,32 @@ Key safety settings:
 
 ## Running tests
 
-There is no automated test suite in the repository proper. Use `--dry-run`,
-`--once`, `--max-ticks` and `--json` to exercise both pipelines safely, plus
-`_selftest.py` (markdown→HTML, quality gate, content ledger, rate limits, tracker
-regressions) and `_webtest.py` (the HTTP security boundary and every content API
-route), both of which run against temporary directories and transmit nothing:
+The repo ships a pytest suite and a lint config. Install the dev extras once:
 
 ```powershell
-.\.venv\Scripts\python.exe _selftest.py
-.\.venv\Scripts\python.exe _webtest.py
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
+Then run everything:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q     # unit + integration tests
+.\.venv\Scripts\python.exe -m ruff check .  # lint (F + E9)
+```
+
+The tests never touch the network — HTTP is monkeypatched — and every run uses
+temporary directories. They also drive the legacy self-test harnesses as
+subprocess guards:
+
+```powershell
+.\.venv\Scripts\python.exe _selftest.py   # markdown→HTML, quality gate, ledgers, tracker
+.\.venv\Scripts\python.exe _spatest.py    # publisher payload shaping
+.\.venv\Scripts\python.exe _webtest.py    # HTTP security boundary + content API routes
+node tests\driver.js                       # renderAuth() browser-component probe
+```
+
+For manual, transmit-free exercise of the pipelines, use `--dry-run`, `--once`,
+`--max-ticks` and `--json`.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the design and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

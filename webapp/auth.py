@@ -68,6 +68,31 @@ SESSION_COOKIE = "ow_session"
 SESSION_TTL_SECONDS = 8 * 3600
 CHALLENGE_TTL_SECONDS = 5 * 60
 
+#: Account roles, least-privileged last. A *viewer* may read; an *operator* may
+#: also drive the pipelines; an *admin* additionally manages credentials and
+#: other accounts, and bypasses per-profile grants.
+ROLES = ("admin", "operator", "viewer")
+ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER = ROLES
+DEFAULT_ROLE = ROLE_ADMIN
+ROLE_LEVELS = {ROLE_VIEWER: 1, ROLE_OPERATOR: 2, ROLE_ADMIN: 3}
+
+SESSION_FILENAME = "sessions.json"
+
+
+def normalize_role(value: str) -> str:
+    """Coerce any input to a known role, defaulting to the least privileged."""
+    role = (value or "").strip().lower()
+    return role if role in ROLES else ROLE_VIEWER
+
+
+def role_level(role: str) -> int:
+    """Numeric weight of a role; unknown roles weigh nothing (viewer-minus)."""
+    return ROLE_LEVELS.get((role or "").strip().lower(), 0)
+
+
+def role_at_least(role: str, required: str) -> bool:
+    return role_level(role) >= role_level(required)
+
 MAX_FAILED_LOGINS = 5
 MAX_LOCK_SECONDS = 3600
 LOGIN_RATE_LIMIT = 30
@@ -344,6 +369,7 @@ class UserStore:
                 "email": email,
                 "password": str(entry.get("password") or ""),
                 "totp": str(entry.get("totp") or ""),
+                "role": normalize_role(str(entry.get("role") or DEFAULT_ROLE)),
                 "recovery": [str(item) for item in (entry.get("recovery") or []) if isinstance(item, str)],
                 "created_at": str(entry.get("created_at") or now_iso()),
                 "last_login": str(entry.get("last_login") or ""),
@@ -423,21 +449,34 @@ class UserStore:
         user = self._users.get(normalize_email(email)) or {}
         return {
             "email": user.get("email", ""),
+            "role": user.get("role", DEFAULT_ROLE),
             "totp_enrolled": bool(user.get("totp")),
             "recovery_codes_left": len(user.get("recovery") or []),
             "created_at": user.get("created_at", ""),
             "last_login": user.get("last_login", ""),
         }
 
+    def role_of(self, email: str) -> str:
+        user = self._users.get(normalize_email(email)) or {}
+        return normalize_role(str(user.get("role") or DEFAULT_ROLE))
+
+    @property
+    def master(self) -> str:
+        """The derived master key, for sealing unrelated stores (e.g. sessions)."""
+        return self._master
+
     # -- mutation ---------------------------------------------------------- #
 
-    def add(self, email: str, password: str, *, confirmation: str = "") -> Dict[str, Any]:
+    def add(self, email: str, password: str, *, confirmation: str = "", role: str = DEFAULT_ROLE) -> Dict[str, Any]:
         key = normalize_email(email)
         if not is_valid_email(key):
             raise AuthError("that does not look like a valid email address")
         problem = password_problem(password, confirmation)
         if problem:
             raise AuthError(problem)
+        wanted = (role or DEFAULT_ROLE).strip().lower()
+        if wanted not in ROLES:
+            raise AuthError(f"role must be one of {', '.join(ROLES)}")
         with self._lock:
             if key in self._users:
                 raise AuthError(f"{key} already exists")
@@ -445,6 +484,7 @@ class UserStore:
                 "email": key,
                 "password": hash_password(password, pepper=self._master),
                 "totp": "",
+                "role": wanted,
                 "recovery": [],
                 "created_at": now_iso(),
                 "last_login": "",
@@ -452,8 +492,24 @@ class UserStore:
                 "locked_until": 0.0,
             }
             self.save()
-        LOG.info("Created UI account for %s", key)
+        LOG.info("Created UI account for %s (%s)", key, wanted)
         return self.describe(key)
+
+    def set_role(self, email: str, role: str) -> str:
+        key = normalize_email(email)
+        wanted = (role or "").strip().lower()
+        if wanted not in ROLES:
+            raise AuthError(f"role must be one of {', '.join(ROLES)}")
+        with self._lock:
+            if key not in self._users:
+                raise AuthError(f"no such account: {key}")
+            if self._users[key].get("role") == ROLE_ADMIN and wanted != ROLE_ADMIN:
+                if sum(1 for user in self._users.values() if user.get("role") == ROLE_ADMIN) <= 1:
+                    raise AuthError("cannot demote the last remaining admin")
+            self._users[key]["role"] = wanted
+            self.save()
+        LOG.info("Role for %s set to %s", key, wanted)
+        return wanted
 
     def remove(self, email: str) -> None:
         key = normalize_email(email)
@@ -597,20 +653,103 @@ def _digest(token: str) -> str:
 
 
 class SessionStore:
-    """In-memory sessions keyed by token digest, plus pending 2FA challenges."""
+    """Sessions keyed by token digest, plus pending 2FA challenges.
 
-    def __init__(self, ttl: int = SESSION_TTL_SECONDS) -> None:
+    In-memory by default. When constructed with a ``path`` and a ``master`` key
+    the live sessions are also mirrored to an HMAC-sealed file so a restart does
+    not sign everybody out (opt-in; see ``security.persistent_sessions``).
+    """
+
+    def __init__(self, ttl: int = SESSION_TTL_SECONDS, *, path: Optional[str | Path] = None, master: str = "") -> None:
         self.ttl = ttl
+        self.path = Path(path) if path else None
+        self._master = master or ""
         self._sessions: Dict[str, Dict[str, Any]] = {}
         self._challenges: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.RLock()
+        self._load()
 
-    def create(self, email: str) -> Tuple[str, int]:
+    @property
+    def persistent(self) -> bool:
+        return self.path is not None and bool(self._master)
+
+    # -- sealing ----------------------------------------------------------- #
+
+    def _mac(self, body: str) -> str:
+        return hmac.new(self._master.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def _load(self) -> None:
+        if not self.persistent or not self.path.is_file():
+            return
+        try:
+            outer = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            LOG.warning("Ignoring unreadable session store %s: %s", self.path, exc)
+            return
+        if not isinstance(outer, dict):
+            return
+        body = str(outer.get("body") or "")
+        if not hmac.compare_digest(str(outer.get("mac") or ""), self._mac(body)):
+            LOG.warning("Session store %s failed its integrity check; starting fresh", self.path)
+            return
+        try:
+            state = json.loads(body)
+        except ValueError:
+            return
+        now = time.time()
+        for digest, entry in (state.get("sessions") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            expires = float(entry.get("expires") or 0)
+            if expires <= now:
+                continue
+            self._sessions[str(digest)] = {
+                "email": normalize_email(str(entry.get("email") or "")),
+                "role": normalize_role(str(entry.get("role") or DEFAULT_ROLE)),
+                "expires": expires,
+            }
+
+    def _persist(self) -> None:
+        if not self.persistent:
+            return
+        state = {"sessions": self._sessions}
+        body = json.dumps(state, separators=(",", ":"), sort_keys=True)
+        payload = json.dumps({"mac": self._mac(body), "body": body})
+        try:
+            assert self.path is not None
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            handle = tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.path.parent),
+                prefix=f".{self.path.name}.", suffix=".tmp", delete=False,
+            )
+            try:
+                with handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(handle.name, self.path)
+            except OSError:
+                try:
+                    os.unlink(handle.name)
+                except OSError:
+                    pass
+                raise
+        except OSError as exc:
+            LOG.warning("Could not write session store %s: %s", self.path, exc)
+
+    # -- sessions ---------------------------------------------------------- #
+
+    def create(self, email: str, role: str = DEFAULT_ROLE) -> Tuple[str, int]:
         token = secrets.token_urlsafe(32)
         now = time.time()
         with self._lock:
-            self._sessions[_digest(token)] = {"email": normalize_email(email), "expires": now + self.ttl}
+            self._sessions[_digest(token)] = {
+                "email": normalize_email(email),
+                "role": normalize_role(role),
+                "expires": now + self.ttl,
+            }
             self._prune(now)
+            self._persist()
         return token, self.ttl
 
     def get(self, token: str) -> Optional[Dict[str, Any]]:
@@ -623,6 +762,7 @@ class SessionStore:
                 return None
             if session["expires"] <= now:
                 del self._sessions[_digest(token)]
+                self._persist()
                 return None
             return dict(session)
 
@@ -630,7 +770,19 @@ class SessionStore:
         if not token:
             return
         with self._lock:
-            self._sessions.pop(_digest(token), None)
+            if self._sessions.pop(_digest(token), None) is not None:
+                self._persist()
+
+    def destroy_user(self, email: str) -> int:
+        """Drop every live session for an account (used after role changes)."""
+        key = normalize_email(email)
+        with self._lock:
+            doomed = [digest for digest, session in self._sessions.items() if session.get("email") == key]
+            for digest in doomed:
+                del self._sessions[digest]
+            if doomed:
+                self._persist()
+        return len(doomed)
 
     def begin_challenge(self, email: str) -> str:
         """Park an email between the password step and the two-factor step."""

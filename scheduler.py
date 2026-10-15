@@ -19,14 +19,10 @@ from config_loader import Config
 from logging_setup import get_logger
 from models import Sponsor
 from prompt_engine import generate, plugin_data_from_config, word_count_message, word_limit
-from senders import get_sender
+from senders import get_sender, preflight
 from tracker import SponsorTracker
 
 LOG = get_logger("scheduler")
-
-
-class SchedulerHalted(Exception):
-    """Raised after too many consecutive failures - stop and investigate."""
 
 
 @dataclass
@@ -162,6 +158,13 @@ class Scheduler:
                 break
 
             channel = sponsor.channel
+            deliverable, deliver_reason = preflight(sponsor)
+            if not deliverable:
+                result.skipped += 1
+                result.notes.append(f"{sponsor.name}: {deliver_reason}")
+                LOG.warning("Preflight failed for %s: %s", sponsor.name, deliver_reason)
+                continue
+
             if not self.config.channel_enabled(channel):
                 result.skipped += 1
                 result.notes.append(f"{channel} channel disabled in config")
@@ -343,13 +346,3 @@ class Scheduler:
             except (ValueError, OSError, TypeError):
                 pass
         self._previous_handlers = {}
-
-
-def bootstrap(config: Config, *, dry_run: Optional[bool] = None, batch_size: Optional[int] = None) -> Scheduler:
-    """Build a Scheduler with a tracker seeded from config."""
-    tracker = SponsorTracker(
-        config.path("paths.tracker_file", "sponsors.json"),
-        seed_sponsors=config.records("sponsors"),
-        rate_limits=config.rate_limits,
-    )
-    return Scheduler(config, tracker, dry_run=dry_run, batch_size=batch_size)

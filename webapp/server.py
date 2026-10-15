@@ -27,6 +27,7 @@ import mimetypes
 import os
 import re
 import secrets
+import ssl
 import threading
 import webbrowser
 from http.cookies import SimpleCookie
@@ -60,13 +61,29 @@ class ApiError(Exception):
         self.status = status
 
 
+_SECURE_COOKIE_MODES = {"auto", "on", "off"}
+
+
+def _normalise_secure_cookie(value: Any) -> str:
+    text = str(value or "auto").strip().lower()
+    return text if text in _SECURE_COOKIE_MODES else "auto"
+
+
 # --------------------------------------------------------------------------- #
 # Application state
 # --------------------------------------------------------------------------- #
 
 
 class App:
-    def __init__(self, base_dir: str | Path, host: str = "127.0.0.1", port: int = 8765) -> None:
+    def __init__(
+        self,
+        base_dir: str | Path,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        *,
+        persistent_sessions: bool = False,
+        secure_cookie: str = "auto",
+    ) -> None:
         self.base_dir = Path(base_dir).expanduser().resolve()
         self.host = host
         self.port = int(port)
@@ -78,9 +95,24 @@ class App:
         if host not in {"0.0.0.0", "::", ""} and host not in self.allowed_hosts:
             self.allowed_hosts.add(host)
         self.auth = auth.UserStore(self.base_dir / auth.USERS_FILENAME)
-        self.sessions = auth.SessionStore()
+        self.secure_cookie = _normalise_secure_cookie(secure_cookie)
+        self.persistent_sessions = bool(persistent_sessions)
+        self.sessions = self._make_sessions()
         self.login_throttle = auth.LoginThrottle()
         self.pending_totp: Dict[str, str] = {}
+
+    def _make_sessions(self) -> auth.SessionStore:
+        if self.persistent_sessions:
+            return auth.SessionStore(path=self.base_dir / auth.SESSION_FILENAME, master=self.auth.master)
+        return auth.SessionStore()
+
+    def configure_security(self, *, persistent_sessions: Optional[bool] = None, secure_cookie: Optional[str] = None) -> None:
+        """Re-wire session persistence / cookie mode from a loaded profile config."""
+        if secure_cookie is not None:
+            self.secure_cookie = _normalise_secure_cookie(secure_cookie)
+        if persistent_sessions is not None and bool(persistent_sessions) != self.persistent_sessions:
+            self.persistent_sessions = bool(persistent_sessions)
+            self.sessions = self._make_sessions()
 
     # -- profile helpers --------------------------------------------------- #
 
@@ -199,25 +231,46 @@ def make_handler(app: App) -> type:
             return self.app.sessions.get(morsel.value) if morsel else None
 
         def _set_session_cookie(self, token: str, max_age: int) -> None:
+            flags = "HttpOnly; SameSite=Strict"
+            if self._cookie_secure():
+                flags += "; Secure"
             self._extra_headers.append(
-                (
-                    "Set-Cookie",
-                    f"{auth.SESSION_COOKIE}={token}; Path=/; Max-Age={max_age}; "
-                    "HttpOnly; SameSite=Strict",
-                )
+                ("Set-Cookie", f"{auth.SESSION_COOKIE}={token}; Path=/; Max-Age={max_age}; {flags}")
             )
+
+        def _cookie_secure(self) -> bool:
+            mode = self.app.secure_cookie
+            if mode == "on":
+                return True
+            if mode == "off":
+                return False
+            # auto: only mark Secure when the request itself came in over TLS.
+            return self._request_is_https()
+
+        def _request_is_https(self) -> bool:
+            forwarded = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+            if forwarded == "https":
+                return True
+            if isinstance(self.connection, ssl.SSLSocket):
+                return True
+            return self.headers.get("X-Forwarded-Proto-SSL") == "on"
 
         def _session_after_login(self, email: str) -> Dict[str, Any]:
             """Mint a session, attach the cookie and note the successful login."""
-            token, ttl = self.app.sessions.create(email)
+            email = auth.normalize_email(email)
+            role = self.app.auth.role_of(email)
+            token, ttl = self.app.sessions.create(email, role=role)
             self.app.auth.record_success(email)
             self._set_session_cookie(token, ttl)
-            LOG.info("Signed in %s", auth.normalize_email(email))
-            return {"email": auth.normalize_email(email), "expires_in": ttl}
+            LOG.info("Signed in %s (%s)", email, role)
+            return {"email": email, "role": role, "expires_in": ttl}
 
         def _clear_session_cookie(self) -> None:
+            flags = "HttpOnly; SameSite=Strict"
+            if self._cookie_secure():
+                flags += "; Secure"
             self._extra_headers.append(
-                ("Set-Cookie", f"{auth.SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
+                ("Set-Cookie", f"{auth.SESSION_COOKIE}=; Path=/; Max-Age=0; {flags}")
             )
 
         # -- API routing ------------------------------------------------- #
@@ -235,19 +288,45 @@ def make_handler(app: App) -> type:
                     if result is not None:
                         self._send_json(result)
                     return
-            if self._session() is None:
+            session = self._session()
+            if session is None:
                 self._send_json({"error": "authentication required", "authenticated": False}, 401)
                 return
+            role = auth.normalize_role(str(session.get("role") or auth.DEFAULT_ROLE))
             for route_method, pattern, func in ROUTES:
                 if route_method != method:
                     continue
                 match = pattern.match(path)
-                if match:
-                    result = func(self, **match.groupdict())
-                    if result is not None:
-                        self._send_json(result)
+                if not match:
+                    continue
+                groups = match.groupdict()
+                required = required_role(method, func)
+                if not auth.role_at_least(role, required):
+                    self._send_json(
+                        {
+                            "error": f"your role ({role}) cannot perform this action",
+                            "required_role": required,
+                            "role": role,
+                        },
+                        403,
+                    )
                     return
+                self._enforce_profile_grant(session, groups.get("pid"))
+                result = func(self, **groups)
+                if result is not None:
+                    self._send_json(result)
+                return
             self._send_json({"error": "not found"}, 404)
+
+        def _enforce_profile_grant(self, session: Dict[str, Any], pid: Optional[str]) -> None:
+            """Honour per-profile `ui.allowed_users` for non-admin accounts."""
+            if not pid:
+                return
+            if auth.normalize_role(str(session.get("role") or "")) == auth.ROLE_ADMIN:
+                return
+            allowed = self.app.profiles.allowed_users(pid)
+            if allowed and auth.normalize_email(str(session.get("email") or "")) not in allowed:
+                raise ApiError("this profile is not shared with your account", 403)
 
         # -- body / responses -------------------------------------------- #
 
@@ -353,9 +432,14 @@ def _auth_state(handler, **_):
         "password_min_length": auth.MIN_PASSWORD_LEN,
         "totp_digits": auth.TOTP_DIGITS,
         "recovery_code_count": auth.RECOVERY_CODE_COUNT,
+        "roles": list(auth.ROLES),
     }
     if session is not None:
         payload["user"] = store.describe(session["email"])
+        role = auth.normalize_role(str(session.get("role") or auth.DEFAULT_ROLE))
+        payload["role"] = role
+        payload["can_write"] = auth.role_at_least(role, auth.ROLE_OPERATOR)
+        payload["is_admin"] = role == auth.ROLE_ADMIN
     return payload
 
 
@@ -500,8 +584,11 @@ def _bootstrap(handler, **_):
     app = handler.app
     from platforms import catalog
 
+    session = handler._session() or {}
+    role = auth.normalize_role(str(session.get("role") or auth.DEFAULT_ROLE))
     return {
         "version": VERSION,
+        "session": {"email": session.get("email", ""), "role": role},
         "presets": preset_catalog(),
         "profiles": [profile.describe() for profile in app.profiles.list()],
         "channels": list(CHANNELS),
@@ -943,6 +1030,36 @@ def _job_cancel(handler, jid: str, **_):
     return {"ok": True, "cancelled": jid}
 
 
+# --------------------------------------------------------------------------- #
+# Role policy
+# --------------------------------------------------------------------------- #
+
+#: Routes only an admin may touch: credential management and token wiring.
+ADMIN_ROUTES = {
+    _profile_secrets,
+    _profile_content_secrets,
+    _github_connect,
+    _github_disconnect,
+}
+
+#: Routes any signed-in account may use, whatever its role (account self-service).
+SELF_SERVICE_ROUTES = {
+    _auth_change_password,
+    _auth_totp_begin,
+    _auth_totp_confirm,
+    _auth_totp_disable,
+}
+
+
+def required_role(method: str, func: Callable[..., Any]) -> str:
+    """Minimum role a route demands. Reads are open to every signed-in account."""
+    if func in ADMIN_ROUTES:
+        return auth.ROLE_ADMIN
+    if method == "GET" or func in SELF_SERVICE_ROUTES:
+        return auth.ROLE_VIEWER
+    return auth.ROLE_OPERATOR
+
+
 #: Routes reachable without a session. Only what signing in needs.
 PUBLIC_ROUTES: List[Tuple[str, Pattern[str], Callable[..., Any]]] = [
     ("GET", re.compile(r"^/api/auth/state$"), _auth_state),
@@ -1027,6 +1144,18 @@ def run_ui(
     except AuthError as exc:
         print(f"Could not load UI accounts: {exc}")
         return 1
+
+    # Security knobs live in the profile's config so each campaign can opt in.
+    default_pid = created or (app.profiles.ids() or [""])[0]
+    if default_pid:
+        try:
+            cfg = app.profiles.load_config(default_pid)
+            app.configure_security(
+                persistent_sessions=cfg.persistent_sessions,
+                secure_cookie=cfg.secure_cookie,
+            )
+        except (ConfigError, AuthError, OSError, ValueError) as exc:
+            LOG.warning("Ignoring security settings from %s: %s", default_pid, exc)
 
     handler = make_handler(app)
     try:

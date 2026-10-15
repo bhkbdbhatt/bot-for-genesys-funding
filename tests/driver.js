@@ -1,28 +1,32 @@
+// Node harness for webapp/static/app.js renderAuth() auth screens.
+// Run: node tests/driver.js   (requires Node; not part of the pytest suite)
 
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
-const src = fs.readFileSync("D:\\plugin-genesys\\bot-for-genesys-funding\\webapp\\static\\app.js", 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '..', 'webapp', 'static', 'app.js'), 'utf8');
 
 function makeEl(tag) {
-  return {
+  const node = {
     tagName: tag, id: '', className: '', innerHTML: '', textContent: '', title: '',
     value: '', hidden: false,
     classes: new Set(),
-    classList: {
-      add: (c) => el.classes.add(c),
-      remove: (c) => el.classes.delete(c),
-      contains: (c) => el.classes.has(c),
-    },
     children: [],
     querySelector: () => null,
     focus() {},
     setAttribute() {},
     removeAttribute() {},
   };
+  node.classList = {
+    add: (c) => node.classes.add(c),
+    remove: (c) => node.classes.delete(c),
+    contains: (c) => node.classes.has(c),
+  };
+  return node;
 }
 const store = {};
 const el = (id) => { if (!store[id]) { store[id] = makeEl('div'); store[id].id = id; } return store[id]; };
-global.document = { getElementById: (id) => store[id] || null, querySelector: () => null, querySelectorAll: () => [], createElement: makeEl, addEventListener() {} }; global.document.addEventListener = global.document.addEventListener || function(){}; global.document.querySelector = global.document.querySelector || function(){return null;};
+global.document = { getElementById: (id) => store[id] || null, querySelector: (sel) => (typeof sel === 'string' && sel[0] === '#') ? el(sel.slice(1)) : null, querySelectorAll: () => [], createElement: makeEl, addEventListener() {} }; global.document.addEventListener = global.document.addEventListener || function(){};
 global.window = { location: { href: '', origin: 'http://127.0.0.1:8911' } };
 global.navigator = { clipboard: null };
 global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };

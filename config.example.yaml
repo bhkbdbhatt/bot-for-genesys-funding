@@ -91,6 +91,17 @@ forum:
   outbox_dir: "forum_outbox"
 
 # -----------------------------------------------------------------------------
+# Discovery sources
+# -----------------------------------------------------------------------------
+# Which sources `discover` scans. Default [github] (unchanged behaviour); add
+# gitlab to sweep both and merge the results into one candidate list. The
+# filters under `github.filters` apply to every source.
+discovery:
+  sources:
+    - "github"
+    # - "gitlab"
+
+# -----------------------------------------------------------------------------
 # GitHub discovery
 # -----------------------------------------------------------------------------
 github:
@@ -116,6 +127,33 @@ github:
   # Fetch owner websites to hunt for a public contact address.
   scrape_public_emails: true
   email_scrape_max_sites: 3
+
+# -----------------------------------------------------------------------------
+# GitLab discovery (only used when `gitlab` is listed in discovery.sources)
+# -----------------------------------------------------------------------------
+# Topics are matched against public projects on gitlab.com. Scanning works
+# anonymously with a lower rate limit; $GITLAB_TOKEN (read_api) raises it.
+gitlab:
+  api_base: "https://gitlab.com/api/v4"
+  token_env: "GITLAB_TOKEN"       # PAT with read_api, optional
+  per_page: 100
+  max_pages: 3
+  request_delay_seconds: 0.4
+  timeout_seconds: 20
+
+# -----------------------------------------------------------------------------
+# Web UI security. Only relevant when you run `python main.py ui`.
+#   secure_cookie        auto (mark the session cookie Secure only over TLS),
+#                        on (always), off (never).
+#   persistent_sessions  keep sessions across restarts by sealing them to
+#                        sessions.json next to users.json (default off).
+#   allowed_users        emails allowed to open this profile; empty = no
+#                        restriction. Admins always have access.
+# -----------------------------------------------------------------------------
+security:
+  secure_cookie: "auto"
+  persistent_sessions: false
+  allowed_users: []
 
 # -----------------------------------------------------------------------------
 # Pre-seeded pipeline. `discover` enriches these with public contact details;
@@ -480,6 +518,42 @@ platforms:
     auth_header: "Authorization"
     auth_scheme: "Bearer"
     include_markdown: true
+    # Sign every POST so the receiver can verify it and reject replays:
+    #   X-Timestamp, X-Signature: sha256=HMAC(timestamp + "." + body),
+    #   X-Idempotency-Key: <article fingerprint>.
+    # signing: auto signs whenever the secret is set; on refuses to send
+    # unsigned; off never signs.
+    secret_env: "WEBHOOK_SECRET"
+    signing: "auto"           # auto | on | off
+
+  # --- Ghost (Admin API) ----------------------------------------------------
+  # The Admin API key is '<id>:<secret>' from Settings -> Integrations. The
+  # publisher signs a 5-minute HS256 JWT per request (no dependency). Set
+  # admin_url to your site's /ghost base, e.g. https://blog.example.com/ghost
+  ghost:
+    enabled: false
+    admin_url: ""             # or set the GHOST_ADMIN_URL environment variable
+    site_url: ""              # public site URL, for building the outcome link
+    status: "published"       # published | draft
+    api_version: "v5.0"
+
+  # --- Bluesky (AT Protocol post + link card) -------------------------------
+  # Posts are <=300 graphemes: the article becomes a title line, a one-line
+  # summary and the canonical link, posted with an external-embed card.
+  # Use an app password (Settings -> App passwords), never your main password.
+  bluesky:
+    enabled: false
+    handle: ""                # or set BLUESKY_HANDLE; e.g. you.bsky.social
+    service: "https://bsky.social"
+
+  # --- Substack (no publishing API) -----------------------------------------
+  # Same hand-off model as CoderLegion/DevDojo: markdown lands in the outbox
+  # for you to paste into the Substack editor, then confirm the live URL.
+  substack:
+    enabled: false
+    submit_url: "https://substack.com/publish"
+    guidelines_url: "https://substack.com/how-it-works"
+    tags: []
 
 
 # -----------------------------------------------------------------------------
@@ -498,5 +572,10 @@ publishing:
   # Seconds between outbound requests, so a burst never looks like a scraper.
   request_delay_seconds: 2.0
   timeout_seconds: 30
+  # Bounded retries for transient failures (429/5xx and network errors).
+  # Serve a 4xx that is not 429 and the request is terminal - never retried.
+  retry:
+    attempts: 3              # total tries (1 = no retry); 1..10
+    backoff_seconds: 2       # base for 2s, 4s, 8s... capped at 30s
   # Ready-to-paste markdown for manual platforms lands here, per platform.
   outbox_dir: "content_outbox"

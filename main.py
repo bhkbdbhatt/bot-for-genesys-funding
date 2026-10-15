@@ -48,6 +48,7 @@ from models import (
 from tracker import SponsorNotFound, SponsorTracker, TrackerError
 from webapp.auth import (
     MASTER_ENV,
+    ROLES,
     USERS_FILENAME,
     AuthError,
     UserStore,
@@ -155,25 +156,35 @@ def build_scheduler(config: Config, tracker: SponsorTracker, args: argparse.Name
 def cmd_discover(args: argparse.Namespace) -> int:
     from discovery import (
         DiscoveryError,
-        client_from_config,
-        discover_sponsors,
+        discover_from_sources,
         render_table,
+        sources_from_config,
     )
 
     config = load_config(args)
     log = get_logger("cli")
-    client = client_from_config(config)
-
+    wanted = [args.source] if args.source and args.source != "all" else (
+        ["all"] if args.source == "all" else None
+    )
     try:
-        limit = client.rate_limit
-        log.info(
-            "GitHub search quota: %s/%s (resets %s)",
-            limit.get("remaining", "?"),
-            limit.get("limit", "?"),
-            limit.get("reset", "?"),
-        )
+        sources = sources_from_config(config, only=wanted)
     except DiscoveryError as exc:
-        log.warning("Could not read rate limit: %s", exc)
+        log.error("%s", exc)
+        return EXIT_USAGE
+
+    for source in sources:
+        if source.name != "github":
+            continue
+        try:
+            limit = source.rate_limit
+            log.info(
+                "GitHub search quota: %s/%s (resets %s)",
+                limit.get("remaining", "?"),
+                limit.get("limit", "?"),
+                limit.get("reset", "?"),
+            )
+        except DiscoveryError as exc:
+            log.warning("Could not read rate limit: %s", exc)
 
     topics = args.topics.split(",") if args.topics else config.github_topics
     topics = [topic.strip().lstrip("#") for topic in topics if topic.strip()]
@@ -181,9 +192,13 @@ def cmd_discover(args: argparse.Namespace) -> int:
         log.error("No topics to scan")
         return EXIT_USAGE
 
-    log.info("Scanning topics: %s", ", ".join(topics))
-    candidates = discover_sponsors(
-        client,
+    log.info(
+        "Scanning topics on %s: %s",
+        ", ".join(source.name for source in sources),
+        ", ".join(topics),
+    )
+    candidates = discover_from_sources(
+        sources,
         topics,
         min_org_repos=config.int("github.filters.min_org_repos", 5, minimum=1),
         min_individual_genesys_repos=config.int("github.filters.min_individual_genesys_repos", 3, minimum=1),
@@ -212,6 +227,7 @@ def cmd_discover(args: argparse.Namespace) -> int:
         emit_json(
             {
                 "topics": topics,
+                "sources": [source.name for source in sources],
                 "qualified": len(candidates),
                 "new": [candidate.to_dict() for candidate in fresh],
                 "already_tracked": [candidate.owner_name for candidate in already],
@@ -221,6 +237,7 @@ def cmd_discover(args: argparse.Namespace) -> int:
         return EXIT_OK
 
     rule("Discovery results")
+    out(f"Sources scanned: {', '.join(source.name for source in sources)}")
     out(f"Topics scanned : {', '.join(topics)}")
     out(f"Owners matched : {len(candidates)}  (new: {len(fresh)}, already tracked: {len(already)})")
     out(f"Cache written  : {cache_path}")
@@ -515,6 +532,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     out(f"Config       : {described['config_file']}")
     out(f"Tracker      : {summary['tracker_file']}")
     out(f"GitHub token : {'set' if described['github_token_set'] else 'not set'}")
+    out(f"Discovery    : {', '.join(described['discovery_sources'])} "
+        f"(GitLab token {'set' if described['gitlab_token_set'] else 'not set'})")
     out(f"Email        : {'enabled' if described['email_enabled'] else 'disabled'} "
         f"({described['smtp']}, password {'set' if described['smtp_password_set'] else 'MISSING'})")
     out(f"Forum        : {'enabled' if described['forum_enabled'] else 'disabled'} "
@@ -1380,16 +1399,34 @@ def cmd_auth(args: argparse.Namespace) -> int:
 
 def auth_adduser(store: UserStore, args: argparse.Namespace) -> int:
     email = require_email(args)
+    role = (getattr(args, "role", None) or "admin").strip().lower()
+    if role not in ROLES:
+        print(f"Role must be one of {', '.join(ROLES)}.")
+        return EXIT_USAGE
     password = args.password or prompt_password(confirm=True)
     if not password:
         return EXIT_USAGE
-    store.add(email, password, confirmation=args.password or password)
+    store.add(email, password, confirmation=args.password or password, role=role)
     rule("account created")
     for key, value in store.describe(email).items():
         out(f"  {key:<20} {value}")
     out("")
     out("Next: sign in and switch on two-factor, or check it here with")
     out(f"  python main.py auth totp --email {email}")
+    return EXIT_OK
+
+
+def auth_role(store: UserStore, args: argparse.Namespace) -> int:
+    email = require_email(args)
+    role = (args.role or "").strip().lower()
+    if role not in ROLES:
+        print(f"Role must be one of {', '.join(ROLES)}.")
+        return EXIT_USAGE
+    if store.get(email) is None:
+        print(f"No such account: {email}")
+        return EXIT_ERROR
+    store.set_role(email, role)
+    print(f"Role for {email} set to {role}")
     return EXIT_OK
 
 
@@ -1403,6 +1440,7 @@ def auth_list(store: UserStore, args: argparse.Namespace) -> int:
     for email in store.emails():
         described = store.describe(email)
         out(f"  {email}")
+        out(f"    role              {described['role']}")
         out(f"    two-factor        {'enrolled' if described['totp_enrolled'] else 'not enrolled'}")
         out(f"    recovery codes    {described['recovery_codes_left']}")
         out(f"    created           {described['created_at'] or '-'}")
@@ -1478,6 +1516,7 @@ def auth_recovery(store: UserStore, args: argparse.Namespace) -> int:
 
 AUTH_COMMANDS = {
     "adduser": auth_adduser,
+    "role": auth_role,
     "list": auth_list,
     "passwd": auth_passwd,
     "remove": auth_remove,
@@ -1637,6 +1676,11 @@ def build_parser() -> argparse.ArgumentParser:
     # discover
     p_discover = sub.add_parser("discover", help="scrape GitHub topics for new prospects")
     p_discover.add_argument("--topics", help="comma separated topics (default: from config)")
+    p_discover.add_argument(
+        "--source",
+        choices=["github", "gitlab", "all"],
+        help="discovery source(s); default: discovery.sources from config",
+    )
     p_discover.add_argument("--channel", choices=CHANNELS, default="email", help="channel for new sponsors")
     p_discover.add_argument("--add", help="add these candidates: 1,3-5 or all")
     p_discover.add_argument("--yes", action="store_true", help="add every new candidate without prompting")
@@ -1724,6 +1768,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_adduser = auth_sub.add_parser("adduser", help="create an account for the web UI")
     p_adduser.add_argument("--email")
     p_adduser.add_argument("--password", help="avoid: leaves the password in shell history")
+    p_adduser.add_argument("--role", default="admin", choices=list(ROLES), help="account role (default: admin)")
+
+    p_role = auth_sub.add_parser("role", help="change an account's role")
+    p_role.add_argument("--email")
+    p_role.add_argument("--role", required=True, choices=list(ROLES))
 
     p_auth_list = auth_sub.add_parser("list", help="show accounts and two-factor status")
     p_auth_list.add_argument("--json", action="store_true", help="machine readable output")
@@ -1774,7 +1823,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         log.info("Interrupted")
         return EXIT_ERROR
     except SystemExit as exc:  # dependency guard, and CLI-level bail-outs
-        return int(exc.code or EXIT_ERROR)
+        code = exc.code
+        if code is None:
+            return EXIT_OK
+        if isinstance(code, int):
+            return code
+        log.error("%s", code)
+        return EXIT_ERROR
     except Exception as exc:  # noqa: BLE001 - last-resort guard
         log.exception("Unhandled error: %s", exc)
         return EXIT_ERROR

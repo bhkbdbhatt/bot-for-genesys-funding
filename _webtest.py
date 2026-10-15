@@ -130,14 +130,15 @@ try:
     check("bad password rejected", status == 400, f"{status} {body}")
 
     print("\n== bootstrap payload ==")
+    from models import PLATFORM_IDS
+
     status, boot = client.get("/api/bootstrap")
     check("bootstrap ok", status == 200)
     check("channels present", boot.get("channels") == ["email", "forum"])
     check("content statuses present", boot.get("content_statuses") == [
         "draft", "approved", "queued", "published", "failed"], str(boot.get("content_statuses")))
-    check("platform ids present", boot.get("platform_ids") == [
-        "devto", "hashnode", "medium", "wordpress", "coderlegion", "devdojo", "webhook"])
-    check("platform registry present", len(boot.get("platforms") or []) == 7)
+    check("platform ids present", boot.get("platform_ids") == list(PLATFORM_IDS))
+    check("platform registry present", len(boot.get("platforms") or []) == len(PLATFORM_IDS))
     check("no secret in bootstrap", "token_set" not in json.dumps(boot).replace('"token_set"', "", 1)
           or all(p.get("kind") for p in boot["platforms"]))
 
@@ -149,7 +150,7 @@ try:
     check("content summary ok", status == 200, f"{status} {body}")
     check("content reports disabled by default", body.get("enabled") is False)
     check("gate enforcement surfaced", body.get("enforce_gate") is True)
-    check("readiness covers all platforms", len(body.get("readiness") or []) == 7)
+    check("readiness covers all platforms", len(body.get("readiness") or []) == len(PLATFORM_IDS))
     check("empty ledger", body.get("items") == [])
 
     status, body = client.get(f"/api/profiles/{pid}/platforms")

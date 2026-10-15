@@ -20,7 +20,9 @@ from models import (
     CHANNEL_FORUM,
     CONTENT_STATUSES,
     PLATFORM_IDS,
+    PROSPECT_SOURCES,
     STATUSES,
+    is_valid_email,
     is_valid_url,
 )
 from platforms import PLATFORMS
@@ -279,6 +281,45 @@ class Config:
             if self.int("github.per_page", 100, minimum=1, maximum=100) < 1:
                 errors.append("github.per_page must be between 1 and 100")
 
+        security = self.section("security")
+        if security:
+            mode = _as_str(security.get("secure_cookie"), "auto").lower()
+            if mode and mode not in {"auto", "on", "off"}:
+                errors.append(f"security.secure_cookie must be auto, on or off (got {mode!r})")
+            allowed = _as_list(security.get("allowed_users"))
+            for index, email in enumerate(allowed):
+                if not is_valid_email(str(email).strip()):
+                    errors.append(
+                        f"security.allowed_users[{index}] is not a valid email (got {email!r})"
+                    )
+
+        discovery = self.section("discovery")
+        if discovery:
+            sources = _as_list(discovery.get("sources"))
+            for index, name in enumerate(sources):
+                cleaned = _as_str(name).strip().lower()
+                if cleaned not in PROSPECT_SOURCES:
+                    errors.append(
+                        f"discovery.sources[{index}] must be one of "
+                        f"{', '.join(PROSPECT_SOURCES)} (got {name!r})"
+                    )
+
+        gitlab = self.section("gitlab")
+        if gitlab:
+            api_base = _as_str(gitlab.get("api_base"), "https://gitlab.com/api/v4")
+            if not is_valid_url(api_base):
+                errors.append(f"gitlab.api_base must be an http(s) URL (got {api_base!r})")
+            if self.int("gitlab.per_page", 100, minimum=1, maximum=100) < 1:
+                errors.append("gitlab.per_page must be between 1 and 100")
+            token_env = _as_str(gitlab.get("token_env"), "GITLAB_TOKEN")
+            if "gitlab" in [str(item).lower() for item in _as_list((discovery or {}).get("sources"))]:
+                token_env = token_env or "GITLAB_TOKEN"
+                if not resolve_secret(token_env):
+                    warnings.append(
+                        f"environment variable {token_env!r} (gitlab.token_env) is not set - "
+                        "GitLab scanning still works anonymously, but with a lower rate limit"
+                    )
+
         sponsors = self._data.get("sponsors") or []
         if not isinstance(sponsors, list):
             errors.append("sponsors must be a list of mappings")
@@ -454,6 +495,20 @@ class Config:
         return topics or ["genesys"]
 
     @property
+    def discovery_sources(self) -> List[str]:
+        """Sources to scan, defaulting to GitHub for back-compatibility."""
+        names = [
+            str(name).strip().lower()
+            for name in self.list("discovery.sources")
+            if str(name).strip()
+        ]
+        return names or ["github"]
+
+    @property
+    def gitlab_token(self) -> str:
+        return resolve_secret(self.str("gitlab.token_env", "GITLAB_TOKEN"))
+
+    @property
     def rate_limits(self) -> Dict[str, int]:
         return {
             CHANNEL_EMAIL: self.int("rate_limits.max_emails_per_day", 15, maximum=100000),
@@ -479,6 +534,24 @@ class Config:
     def plugin(self) -> Dict[str, Any]:
         return self.section("plugin")
 
+    # -- web UI security --------------------------------------------------- #
+
+    @property
+    def secure_cookie(self) -> str:
+        """`security.secure_cookie`: auto | on | off (default auto)."""
+        value = self.str("security.secure_cookie", "auto").lower()
+        return value if value in {"auto", "on", "off"} else "auto"
+
+    @property
+    def persistent_sessions(self) -> bool:
+        """Keep UI sessions across restarts (opt-in; default off)."""
+        return self.bool("security.persistent_sessions", False)
+
+    @property
+    def allowed_users(self) -> List[str]:
+        """`security.allowed_users`: emails permitted to use this profile."""
+        return [email.lower() for email in self.list("security.allowed_users") if email.strip()]
+
     def channel_enabled(self, channel: str) -> bool:
         return self.bool(f"{channel}.enabled", True)
 
@@ -490,6 +563,8 @@ class Config:
             "repo_url": self.str("plugin.repo_url"),
             "topics": self.github_topics,
             "github_token_set": bool(self.github_token),
+            "discovery_sources": self.discovery_sources,
+            "gitlab_token_set": bool(self.gitlab_token),
             "email_enabled": self.channel_enabled(CHANNEL_EMAIL),
             "smtp": f"{self.str('email.smtp_host')}:{self.int('email.smtp_port', 0)}",
             "smtp_password_set": bool(resolve_secret(self.str("email.password_env"))),

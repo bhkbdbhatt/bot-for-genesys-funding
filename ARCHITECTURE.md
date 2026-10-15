@@ -105,12 +105,15 @@ main.py            CLI parsing, command dispatch, composition root
   |           +-- publishers/hashnode.py       GraphQL
   |           +-- publishers/medium.py         legacy REST (no new tokens)
   |           +-- publishers/wordpress.py      wp.com / wp-json
+  |           +-- publishers/ghost.py          Ghost Admin API (HS256 JWT)
+  |           +-- publishers/bluesky.py        AT Protocol post + link card
   |           +-- publishers/manual.py         base for no-API platforms
   |           |     +-- publishers/coderlegion.py
   |           |     +-- publishers/devdojo.py
-  |           +-- publishers/webhook.py        generic JSON POST
+  |           |     +-- publishers/substack.py
+  |           +-- publishers/webhook.py        generic JSON POST (HMAC-signed)
   |           +-- publishers/markdown_html.py  markdown -> HTML
-  +-- discovery.py       GitHub REST prospecting + public email scraping
+  +-- discovery.py       pluggable prospecting (GitHub/GitLab) + email scraping
   +-- logging_setup.py   console + rotating-file logging
   +-- webapp/            optional local web wizard (stdlib http.server)
         +-- auth.py        password hashing, TOTP, accounts, sessions
@@ -335,8 +338,10 @@ differ on purpose:
 `publishers/base.py` owns everything shared: `PublishOutcome`, the config
 accessors, the credential indirection (`token_envs` — a list, because WordPress
 accepts either an application password or an OAuth token), the mode determination,
-`_request()` (timeout, transport-error mapping, a single retry for 429/5xx
-honouring `Retry-After`, never logging a credential), the manual hand-off
+`_request()` (timeout, transport-error mapping, bounded exponential retries for
+429/5xx and transport errors — `publishing.retry.attempts` / `backoff_seconds`,
+with a `Retry-After` floor, and every other 4xx terminal — never logging a
+credential), the manual hand-off
 (`content_outbox/<platform>/<id>.md` plus printed steps), and `check()`.
 
 `check()` reports real readiness **ignoring dry-run** — a rehearsal that reports
@@ -350,12 +355,21 @@ schemes to `http(s)` / `mailto` / relative — so no input can inject markup or 
 `javascript:` / `data:` URL. Constructs outside the subset degrade to escaped text
 rather than being dropped.
 
-### `discovery.py` — GitHub prospecting
-`GitHubClient` wraps a `requests.Session` for the search, user and rate-limit
-endpoints and maps HTTP failures to actionable `DiscoveryError` messages. Owner
-lookups are budgeted (`max_owner_lookups`) and results are deduplicated across
-topics. Email scraping is best-effort over only public profile/website data,
-filters noise domains and prefers role addresses.
+### `discovery.py` — pluggable prospect sources
+Every source implements the `ProspectSource` protocol — `search_repositories`,
+`get_owner`, `find_public_email` — and returns GitHub-shaped repository dicts,
+so `aggregate_repositories`, `passes_filter` and the ranking pass are
+source-agnostic. `GitHubClient` and `GitLabClient` are the shipped sources;
+`sources_from_config` builds the ones named in `discovery.sources` and
+`discover_from_sources` sweeps them all, merging candidates by normalized owner
+name (`merge_candidates`) and logging-but-skipping any source that fails.
+
+Each client wraps a `requests.Session` and maps HTTP failures to actionable
+`DiscoveryError` messages. Owner lookups are budgeted (`max_owner_lookups`) and
+results are deduplicated across topics. Email scraping is best-effort over only
+public profile/website data, filters noise domains and prefers role addresses.
+The GitLab client normalizes projects (`star_count` → `stargazers_count`,
+`namespace.kind` → owner type) and looks an owner up as a user, then a group.
 
 ### `logging_setup.py` — logging
 Console (ANSI, TTY-aware) plus a rotating file handler. `setup_logging()` makes
@@ -443,6 +457,22 @@ it protects the file no better than the filesystem already does.
 `UserStore` writes atomically exactly like the other stores, and `SessionStore` /
 `LoginThrottle` are guarded by locks because `ThreadingHTTPServer` handles each
 request on its own thread.
+
+**Roles.** Each account carries a `role` of `admin`, `operator` or `viewer`.
+`server.required_role()` derives the minimum role per route — reads need
+`viewer`, writes need `operator`, credential routes (`*/secrets`, GitHub connect)
+need `admin`, and account self-service (password, 2FA) is open to any signed-in
+account. A role below the minimum is answered with `403` before the handler runs.
+An optional per-profile `security.allowed_users` list further limits non-admin
+accounts to named emails; admins always bypass it. The role is baked into the
+session at sign-in and mirrored in `users.json`, and the CLI manages it with
+`auth adduser --role` / `auth role` (the last admin cannot be demoted).
+
+**Sessions.** In-memory by default. `security.persistent_sessions: true` mirrors
+them to an HMAC-sealed `sessions.json` (8 h TTL, atomic writes) so a restart does
+not sign everybody out. `security.secure_cookie` (`auto`/`on`/`off`) decides
+whether the cookie carries `Secure`; `auto` marks it only for TLS requests.
+Job logs are redacted by `webapp/jobs.redact()` before the browser can read them.
 
 The UI is a **thin client of both pipelines**: it cannot publish an article the
 CLI would refuse, and it inherits the persist-after-every-action guarantee because
@@ -539,9 +569,13 @@ changing code:
   limits and the CLI's `--platform` choices all follow.
 - **A manual-submission platform:** subclass `publishers.manual.ManualPublisher`
   and override `submit_url` / `categories` / `submission_instructions` — as
-  `coderlegion.py` and `devdojo.py` do in a dozen lines each.
-- **New prospect source:** add a client alongside `discovery.py` that returns
-  `DiscoveredSponsor` values and feeds `tracker.add()`.
+  `coderlegion.py`, `devdojo.py` and `substack.py` do in a dozen lines each.
+- **New prospect source:** implement the `ProspectSource` protocol (a
+  `name`, `search_repositories`, `get_owner`, `find_public_email`),
+  normalize results to the GitHub project shape, add the id to
+  `models.PROSPECT_SOURCES`, and wire a builder into
+  `discovery.sources_from_config`. Aggregation, filtering, merging and the CLI
+  follow automatically.
 - **New rendering backend:** supply any `Callable[[str], str]` as `llm_renderer`
   to `prompt_engine.generate()` or `content_engine.generate()`.
 - **A new gate rule:** add it to `content_engine.validate()`. It then runs in
@@ -569,16 +603,18 @@ changing code:
   non-Pro path; the error message says so.
 - Medium is a legacy integration: the code is correct for a pre-2025 token, but
   new accounts cannot obtain one.
-- `scheduler.bootstrap()` and `senders.preflight()` are public helpers not used by
-  `main.py`; `SchedulerHalted` is defined but never raised (the boolean `halted`
-  flag is the real mechanism).
+- `scheduler.bootstrap()` and `promoter.bootstrap()` were removed; composition
+  lives in `main.py` and `webapp/service.py`. `senders.preflight()` is now wired
+  into `Scheduler._deliver` as a channel-agnostic gate. `SchedulerHalted` was
+  removed (the boolean `halted` flag is the real mechanism).
 - Every account is an administrator. There is no second factor *for* the CSRF
   token and no per-profile permission, so anyone who can sign in can send on every
   campaign.
 - Sessions are in-memory, so a restart signs everyone out, and the cookie has no
   `Secure` attribute because the server speaks plain HTTP on loopback. Do not bind
   the wizard to a public interface.
-- `main()` maps `SystemExit(0)` to exit code 1 (`exc.code or EXIT_ERROR`), so
-  helpers must return `EXIT_OK` rather than raise it.
-- One configured webhook URL per campaign, with no per-request signing. Use it
-  against an endpoint you trust with your content.
+- `main()` now maps `SystemExit` codes faithfully: `None`/`0` → 0, ints pass
+  through, anything else logs and returns 1.
+- One configured webhook URL per campaign. It is off by default and sends no
+  signature until `WEBHOOK_SECRET` is set (or `platforms.webhook.signing: on`);
+  point it only at an endpoint you trust with your content.

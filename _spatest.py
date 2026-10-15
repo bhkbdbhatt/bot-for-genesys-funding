@@ -81,7 +81,9 @@ check("applyBind is a no-op without a draft", "if (!state.draft) return;" in app
 check("applyBind writes through setPath", "setPath(state.draft, bind, value)" in apply_bind)
 
 print("\n== platform field tables ==")
-for platform in ("devto", "hashnode", "medium", "wordpress", "coderlegion", "devdojo", "webhook"):
+from models import PLATFORM_IDS  # noqa: E402 - after the static reads above
+
+for platform in PLATFORM_IDS:
     check(f"PLATFORM_FIELDS has {platform}",
           re.search(rf"\n  {platform}: \[", APP) is not None)
 

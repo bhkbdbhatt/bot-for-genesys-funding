@@ -262,6 +262,7 @@ def run_discovery(
     ctx,
     *,
     topics: Optional[Iterable[str]] = None,
+    sources: Optional[Iterable[str]] = None,
     min_org_repos: Optional[int] = None,
     min_individual_genesys_repos: Optional[int] = None,
     min_stars: Optional[int] = None,
@@ -275,28 +276,35 @@ def run_discovery(
     """Run a full discovery sweep and fold the result into this profile."""
     from discovery import (
         DiscoveryError,
-        client_from_config,
-        discover_sponsors,
+        discover_from_sources,
+        sources_from_config,
     )
 
     topic_list = [str(topic).strip().lstrip("#") for topic in (topics or config.github_topics) if str(topic).strip()]
     if not topic_list:
         raise ValueError("no topics configured - add at least one search topic")
 
-    client = client_from_config(config)
-    with capture_logs(ctx.log):
-        try:
-            rate = client.rate_limit
-            ctx.progress(topics=topic_list, stage="searching")
-            ctx.log(
-                f"GitHub search quota: {rate.get('remaining', '?')}/{rate.get('limit', '?')} "
-                f"(resets {rate.get('reset', '?')})"
-            )
-        except DiscoveryError as exc:
-            ctx.log(f"Could not read rate limit: {exc}")
+    wanted = [str(name).strip().lower() for name in sources if str(name).strip()] if sources else None
+    try:
+        active_sources = sources_from_config(config, only=wanted)
+    except DiscoveryError as exc:
+        raise ValueError(str(exc)) from exc
 
-        candidates = discover_sponsors(
-            client,
+    with capture_logs(ctx.log):
+        github = next((item for item in active_sources if item.name == "github"), None)
+        if github is not None:
+            try:
+                rate = github.rate_limit
+                ctx.log(
+                    f"GitHub search quota: {rate.get('remaining', '?')}/{rate.get('limit', '?')} "
+                    f"(resets {rate.get('reset', '?')})"
+                )
+            except DiscoveryError as exc:
+                ctx.log(f"Could not read rate limit: {exc}")
+        ctx.progress(topics=topic_list, sources=[item.name for item in active_sources], stage="searching")
+
+        candidates = discover_from_sources(
+            active_sources,
             topic_list,
             min_org_repos=int(min_org_repos if min_org_repos is not None else config.int("github.filters.min_org_repos", 5, minimum=1)),
             min_individual_genesys_repos=int(
@@ -337,6 +345,7 @@ def run_discovery(
     ctx.log(f"Discovery complete: {len(candidates)} owner(s) qualified, {len(fresh)} new.")
     return {
         "topics": topic_list,
+        "sources": [item.name for item in active_sources],
         "qualified": len(candidates),
         "new": len(fresh),
         "already_tracked": [candidate.owner_name for candidate in already],

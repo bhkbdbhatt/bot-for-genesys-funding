@@ -291,18 +291,23 @@ class BasePublisher:
         params: Optional[Dict[str, Any]] = None,
         label: str = "",
     ) -> requests.Response:
-        """One HTTP call with the project's error mapping and a single retry.
+        """One HTTP call with the project's error mapping and bounded retries.
 
-        Raises `PublishError` for anything the caller cannot act on. The retry
-        covers only transient conditions (429/5xx) and honours `Retry-After`
-        when the server sends it, so a rate-limited platform backs off instead
-        of being hammered on the next tick.
+        Retries cover only transient conditions - 429/5xx responses and transport
+        errors (timeout, connection reset) - with exponential backoff capped by
+        ``Retry-After`` when the server sends it. Every other 4xx is terminal and
+        raised immediately, so a 401 or 422 is never hammered. ``publishing.
+        retry.attempts`` (default 3, i.e. two retries) and ``publishing.retry.
+        backoff_seconds`` (default 2) bound the ladder.
         """
         request_headers = {"Accept": "application/json", "User-Agent": self.user_agent()}
         request_headers.update(headers or {})
         what = label or f"{method} {url}"
+        attempts = self._retry_attempts()
+        base_backoff = self._retry_backoff()
 
-        for attempt in (1, 2):
+        for attempt in range(1, attempts + 1):
+            last = attempt >= attempts
             try:
                 response = requests.request(
                     method,
@@ -313,13 +318,24 @@ class BasePublisher:
                     headers=request_headers,
                     timeout=self.timeout,
                 )
-            except requests.Timeout as exc:
-                raise PublishError(f"{what}: timed out after {self.timeout}s") from exc
             except requests.RequestException as exc:
-                raise PublishError(f"{what}: {type(exc).__name__}: {exc}") from exc
+                if last:
+                    reason = (
+                        f"timed out after {self.timeout}s"
+                        if isinstance(exc, requests.Timeout)
+                        else f"{type(exc).__name__}: {exc}"
+                    )
+                    raise PublishError(f"{what}: {reason}") from exc
+                delay = self._backoff_delay(base_backoff, attempt)
+                LOG.warning(
+                    "%s: transport error (%s); retrying in %ss",
+                    what, type(exc).__name__, delay,
+                )
+                time.sleep(delay)
+                continue
 
-            if response.status_code in RETRY_STATUSES and attempt == 1:
-                delay = _retry_after(response)
+            if response.status_code in RETRY_STATUSES and not last:
+                delay = max(_retry_after(response), self._backoff_delay(base_backoff, attempt))
                 LOG.warning(
                     "%s returned HTTP %s; retrying in %ss", what, response.status_code, delay
                 )
@@ -331,7 +347,18 @@ class BasePublisher:
                     f"{what}: HTTP {response.status_code} {_body_excerpt(response)}"
                 )
             return response
-        raise PublishError(f"{what}: still failing after retry")
+        raise PublishError(f"{what}: still failing after {attempts} attempts")
+
+    def _retry_attempts(self) -> int:
+        return self.config.int("publishing.retry.attempts", 3, minimum=1, maximum=10)
+
+    def _retry_backoff(self) -> float:
+        return max(self.config.float("publishing.retry.backoff_seconds", 2.0), 0.0)
+
+    @staticmethod
+    def _backoff_delay(base: float, attempt: int) -> float:
+        """Exponential backoff for the Nth attempt (1-indexed), capped at 30s."""
+        return min(base * (2 ** (attempt - 1)), 30.0)
 
     @staticmethod
     def user_agent() -> str:
@@ -447,11 +474,16 @@ class BasePublisher:
 
 
 def _retry_after(response: requests.Response) -> int:
+    """`Retry-After` in seconds, clamped to 30, or 0 when absent.
+
+    Zero means "no server guidance" - the caller's exponential backoff governs.
+    A present header always raises the floor, so a server-requested pause wins.
+    """
     raw = response.headers.get("Retry-After", "")
     try:
-        return max(min(int(raw), 30), 1)
+        return max(min(int(raw), 30), 0)
     except (TypeError, ValueError):
-        return 5
+        return 0
 
 
 def _body_excerpt(response: requests.Response, limit: int = 300) -> str:
