@@ -1,4 +1,4 @@
-# GenesysPluginSponsorBot
+# Bot For Opensource Funding
 
 A dependency-light Python tool that promotes one open-source project two ways.
 
