@@ -1286,8 +1286,11 @@ function renderContent() {
       '</div>' +
       '<div class="small muted mb">Targets (defaults to every enabled platform)</div>' +
       '<div class="flex wrap">' + (platformBoxes || '<span class="hint">Enable a platform first.</span>') + '</div>' +
+      '<div class="grid-2">' +
+      '<label class="field"><span>README / source file (optional)</span><input type="text" id="cd-source" placeholder="README.md"></label>' +
+      '</div>' +
       '<div class="actions mt"><button class="primary" data-action="content-draft">Draft article</button>' +
-      flagCheck('Render with the configured LLM command', 'contentDraftLlm', state.contentDraftLlm) +
+      flagCheck('Render with the configured LLM (subprocess or API)', 'contentDraftLlm', state.contentDraftLlm) +
       '</div></div>' +
       '<div class="card"><h3>What the gate checks</h3>' +
       '<ul class="list small">' +
@@ -1635,12 +1638,15 @@ async function actionContentDraft() {
   }
   const title = ($('#cd-title') || {}).value || '';
   const topic = ($('#cd-topic') || {}).value || '';
+  const sourceFile = ($('#cd-source') || {}).value || '';
   try {
     const result = await api('POST', '/api/profiles/' + state.profileId + '/content/draft', {
       title: title,
       topic: topic,
       platforms: contentPlatformSelection(),
       llm: state.contentDraftLlm,
+      readme: sourceFile,
+      source: sourceFile,
     });
     state.contentDraftResult = result;
     await loadContent();

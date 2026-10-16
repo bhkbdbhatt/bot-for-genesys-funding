@@ -157,6 +157,7 @@ def content_data_from_config(config) -> Dict[str, Any]:  # noqa: ANN001 - avoid 
         "call_to_action": config.str("content.call_to_action"),
         "closing": config.str("content.closing"),
         "plugin": plugin,
+        "source_file": config.str("content.source_file") or config.str("content.readme"),
     }
 
 
@@ -649,44 +650,44 @@ def prepare_for_platform(
 # --------------------------------------------------------------------------- #
 
 PROMPT_TEMPLATE = """\
-Write a technical article for {platform_label} ({platform_id}).
+Write a technical article for {{platform_label}} ({{platform_id}}).
 
 AUDIENCE
-{audience}
+{{audience}}
 
 VOICE
-- {tone}
-- Written by: {persona}
-- Language: {language}
+- {{tone}}
+- Written by: {{persona}}
+- Language: {{language}}
 
 FORMAT
 - GitHub-flavoured markdown. Start with a single `# H1`, then `## H2` sections.
-- Title: at most {max_title_words} words.
-- Body: {min_words}-{max_words} words.
-- {tag_line}
+- Title: at most {{max_title_words}} words.
+- Body: {{min_words}}-{{max_words}} words.
+- {{tag_line}}
 
 STRUCTURE
-{sections}
+{{sections}}
 
 HARD RULES
-{rules}
+{{rules}}
 
 FACTS (use only these - never invent anything else)
-project: {plugin_name}
-what it replaces: {value_prop}
-description: {description}
+project: {{plugin_name}}
+what it replaces: {{value_prop}}
+description: {{description}}
 capabilities:
-{features}
-repository: {repo_url}
-listing: {appfoundry_url}
-demo: {demo_url}
-licence: {license}
-editorial angle: {angle}
-call to action: {cta}
-sponsorship ask: {ask}
+{{features}}
+repository: {{repo_url}}
+listing: {{appfoundry_url}}
+demo: {{demo_url}}
+licence: {{license}}
+editorial angle: {{angle}}
+call to action: {{cta}}
+sponsorship ask: {{ask}}
 
 DISCLOSURE
-{disclosure}
+{{disclosure}}
 
 Return only the article, starting with the `# H1`. No preamble, no explanation
 of what you are doing, no placeholder text in braces."""
@@ -733,6 +734,14 @@ def render_prompt(
         ]
     )
 
+    source_text = str(data.get("source_text") or "")
+    if source_text:
+        if len(source_text) > 6000:
+            source_text = source_text[:6000] + "\n... (truncated)"
+        source_block = "\n\nSOURCE DOCUMENT (readme/brief material):\n" + source_text
+    else:
+        source_block = ""
+
     values: Dict[str, Any] = {
         "platform_id": platform or "any",
         "platform_label": platform_label(platform),
@@ -761,7 +770,8 @@ def render_prompt(
         "ask": plugin.get("ask", ""),
         "disclosure": str(data.get("disclosure") or "required - state the affiliation in the first paragraph"),
     }
-    return render_template(PROMPT_TEMPLATE, values).strip()
+    prompt = render_template(PROMPT_TEMPLATE, values).strip()
+    return prompt + source_block
 
 
 # --------------------------------------------------------------------------- #
@@ -807,6 +817,7 @@ def generate(
     platform: str = "",
     llm_renderer: Optional[Callable[[str], str]] = None,
     fallback_title: str = "",
+    source_text: str = "",
 ) -> Dict[str, Any]:
     """Produce an article for ``platform``.
 
@@ -816,6 +827,8 @@ def generate(
     :func:`compose`, which is the same fail-safe contract `prompt_engine` uses.
     """
     data = dict(content or {})
+    if source_text:
+        data["source_text"] = str(source_text)
     spec = get_platform(platform)
     seed_title = title or topic or data.get("angle") or fallback_title or str(
         (data.get("plugin") or {}).get("name") or "the project"

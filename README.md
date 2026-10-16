@@ -210,10 +210,27 @@ undisclosed posts may get removed".
 ### Renderers
 
 The deterministic composer needs no LLM and is the default, in both pipelines.
-Set `scheduler.llm_command` (for example `["ollama", "run", "llama3.1"]`) and pass
-`--llm` to `draft` / `publish` / `generate` / `run` to render through it. The bot
-never calls an LLM API itself. If the renderer errors, returns nothing, or
-returns too little to be an article, the deterministic composer takes over.
+Pass `--llm` to `draft` / `publish` / `generate` / `run` to render through an
+external LLM instead. Two transports are supported:
+
+- **Subprocess** — `scheduler.llm_command` runs a local CLI (for example
+  `["ollama", "run", "llama3.1"]`); the prompt goes to stdin and the message
+  comes back on stdout.
+- **HTTP API** — `scheduler.llm_api` posts the prompt to a chat API. Known
+  providers are `openai`, `anthropic`, `ollama`, `openrouter`, `mistral`,
+  `groq`, `together`, `perplexity`, `xai` and `deepseek`; `ollama` needs no key.
+  The key itself is never stored in the config — `api_key_env` names the
+  environment variable that holds it.
+
+A non-empty `provider` (or `endpoint`) selects the API transport and takes
+precedence over `llm_command`; fill in just the one you use. If the renderer
+errors, returns nothing, or returns too little to be an article, the
+deterministic composer takes over and the draft is labelled `deterministic`.
+
+`draft` can also build the article from a local document instead of the config:
+`--readme README.md` (or `--source docs/overview.md`) reads the file, merges the
+facts it can find into the content config and shows the raw text to the renderer.
+`content.source_file` makes that the default for a profile.
 
 
 ## Local web wizard
@@ -344,8 +361,8 @@ Two pipelines, one shared runtime.
 2. **Track** (`tracker.py`) — keeps prospects, pipeline status, daily send
    counters and an event history in `sponsors.json`, written atomically.
 3. **Generate** (`prompt_engine.py`) — composes a channel-specific message from
-   templates. With `--llm` it shells out to a command you configure (for example
-   `ollama run llama3.1`); the bot itself never calls an LLM API.
+   templates. With `--llm` it renders through the configured subprocess command
+   or HTTP API; without it the built-in composer is used.
 4. **Send** (`senders/`) — dispatches through `EmailSender` (SMTP) or
    `ForumSender` (JSON API or a manual copy-paste outbox).
 5. **Schedule** (`scheduler.py`) — ticks on an interval, respects daily quotas,

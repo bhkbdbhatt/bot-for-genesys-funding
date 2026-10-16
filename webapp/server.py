@@ -846,6 +846,7 @@ def _profile_content_draft(handler, pid: str, **_):
     platforms = body.get("platforms")
     if isinstance(platforms, str):
         platforms = [part.strip() for part in platforms.split(",") if part.strip()]
+    readme_path = str(body.get("readme") or body.get("source_file") or body.get("source") or "")
     return service.draft_article(
         config,
         title=str(body.get("title") or ""),
@@ -853,6 +854,7 @@ def _profile_content_draft(handler, pid: str, **_):
         platforms=[str(item) for item in platforms] if platforms else None,
         use_llm=bool(body.get("llm")),
         approve=bool(body.get("approve")),
+        readme_path=readme_path,
     )
 
 

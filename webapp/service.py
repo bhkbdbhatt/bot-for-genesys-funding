@@ -106,23 +106,17 @@ def build_renderer(config: Config, use_llm: bool):
     """Return an LLM renderer, or None. Raises when misconfigured."""
     if not use_llm:
         return None
-    from llm import LLMError, SubprocessLLM
+    from llm import LLMError, build_renderer_from_config
 
-    command = config.list("scheduler.llm_command")
-    if not command:
-        raise ConfigError(
-            "LLM rendering requested but scheduler.llm_command is empty. "
-            'Set it to a local CLI, e.g. ["ollama", "run", "llama3.1"].'
-        )
     try:
-        renderer = SubprocessLLM(
-            command,
-            timeout=config.int("scheduler.llm_timeout_seconds", 120, minimum=5, maximum=900),
-        )
+        renderer = build_renderer_from_config(config)
     except LLMError as exc:
         raise ConfigError(str(exc)) from exc
-    if not renderer.exists():
-        raise ConfigError(f"renderer {renderer.describe()!r} is not on PATH")
+    if renderer is None:
+        raise ConfigError(
+            "LLM rendering requested but no renderer is configured. "
+            "Set scheduler.llm_command or scheduler.llm_api.* in config.yaml."
+        )
     return renderer
 
 
@@ -671,6 +665,8 @@ def draft_article(
     platforms: Optional[List[str]] = None,
     use_llm: bool = False,
     approve: bool = False,
+    readme_path: str = "",
+    source_path: str = "",
 ) -> Dict[str, Any]:
     """Compose an article into the ledger. Never transmits."""
     from content_store import ContentStore
@@ -681,12 +677,23 @@ def draft_article(
     store = build_content_store(config)
     targets = [pid for pid in (platforms or config.platforms_enabled()) if pid in PLATFORM_IDS]
     renderer = build_renderer(config, use_llm)
+
+    source_text = ""
+    source_file = readme_path or source_path or ""
+    try:
+        from sources import read_for_content
+
+        data, source_text = read_for_content(config, data, source_file)
+    except Exception as exc:
+        LOG.warning("Could not read the source document: %s", exc)
+
     composed = generate(
         data,
         title=title,
         topic=topic,
         platform=targets[0] if targets else "",
         llm_renderer=renderer,
+        source_text=source_text,
     )
     item = ContentItem(
         id=ContentStore.make_id(composed["title"], topic),

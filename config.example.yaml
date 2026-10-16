@@ -279,8 +279,18 @@ scheduler:
   # built-in composer. The command receives the prompt on stdin and must print
   # the final message on stdout. Example: ["ollama", "run", "llama3.1"]
   # Used by BOTH `generate`/`run` (outreach) and `draft`/`publish` (content).
-  llm_command: []
+  llm_command: []            # e.g. ["ollama", "run", "llama3.1"]
   llm_timeout_seconds: 120
+  # Optional HTTP API renderer (e.g. OpenAI-compatible). A non-empty provider
+  # (or endpoint) selects this transport and takes precedence over llm_command.
+  # Fill in only the transport you use; leave provider empty to ignore this block.
+  llm_api:
+    provider: ""              # openai|anthropic|ollama|openrouter|together|groq|mistral|...
+    model: ""
+    endpoint: ""
+    api_key_env: ""           # env var name, e.g. OPENAI_API_KEY
+    max_tokens: 2048
+    temperature: 0.7
 
 # -----------------------------------------------------------------------------
 # Paths / logging
@@ -311,8 +321,9 @@ paths:
 # The editorial brief
 #
 # Everything here is used by the deterministic composer (`python main.py draft`).
-# If you add `scheduler.llm_command`, the same facts are rendered into an LLM
-# prompt instead - the fields mean the same thing either way.
+# If you add `scheduler.llm_command` or configure `scheduler.llm_api`, the
+# same facts are rendered into an LLM prompt instead - the fields mean the
+# same thing either way.
 # -----------------------------------------------------------------------------
 content:
   enabled: false           # master switch. Nothing is published until this is true.
@@ -366,6 +377,10 @@ content:
     - "opentelemetry"
     - "opensource"
     - "cloud"
+
+  # Read a README/source file automatically when drafting (merged as context).
+  # Leave empty to skip auto-discovery. Can also be passed as --readme.
+  source_file: ""             # e.g. "README.md"
 
   # Platforms new drafts target when `--platform` is omitted. Empty means
   # "every platform you have enabled".

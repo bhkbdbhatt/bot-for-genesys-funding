@@ -30,6 +30,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   token-like values.
 - **Quality foundation:** `pyproject.toml`, a full pytest suite, and a GitHub
   Actions workflow running `ruff` and `pytest` on Python 3.10–3.12.
+- **Source documents + API renderer:** `draft` (and the web wizard) can build an
+  article from a local README / brief file (`--readme`, `--source`,
+  `content.source_file`) via the new `sources.py`, merging missing plugin facts
+  and passing the raw text to the renderer. `scheduler.llm_api` adds an HTTP
+  chat-API renderer (`openai`, `anthropic`, `ollama`, and other OpenAI-compatible
+  providers) alongside `scheduler.llm_command`, with the same fail-soft fallback
+  to the deterministic composer.
 - **Docs and hygiene:** rewritten `SECURITY.md`, this `CHANGELOG.md`,
   `CONTRIBUTING.md`, `AGENTS.md`, and `README.md` / `ARCHITECTURE.md` updates.
 

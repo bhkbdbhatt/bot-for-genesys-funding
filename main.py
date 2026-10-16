@@ -117,28 +117,9 @@ def build_tracker(config: Config, args: argparse.Namespace) -> SponsorTracker:
 
 
 def build_scheduler(config: Config, tracker: SponsorTracker, args: argparse.Namespace):
-    from llm import LLMError, SubprocessLLM
     from scheduler import Scheduler
 
-    renderer = None
-    if getattr(args, "llm", False):
-        command = config.list("scheduler.llm_command")
-        if not command:
-            raise ConfigError(
-                "--llm requested but scheduler.llm_command is empty. "
-                'Set it to a local CLI, e.g. ["ollama", "run", "llama3.1"].'
-            )
-        try:
-            renderer = SubprocessLLM(
-                command,
-                timeout=config.int("scheduler.llm_timeout_seconds", 120, minimum=5, maximum=900),
-            )
-        except LLMError as exc:
-            raise ConfigError(f"--llm requested but {exc}") from exc
-        if not renderer.exists():
-            raise ConfigError(f"--llm requested but {renderer.describe()!r} is not on PATH")
-        LOG_RENDERER = get_logger("cli")
-        LOG_RENDERER.info("Using external renderer: %s", renderer.describe())
+    renderer = _renderer_for(config, getattr(args, "llm", False))
     return Scheduler(
         config,
         tracker,
@@ -729,22 +710,19 @@ def _renderer_for(config: Config, use_llm: bool):
     """Shared LLM-renderer wiring for `draft` and `publish`."""
     if not use_llm:
         return None
-    from llm import LLMError, SubprocessLLM
+    from llm import LLMError, build_renderer_from_config
 
-    command = config.list("scheduler.llm_command")
-    if not command:
-        raise ConfigError(
-            "--llm requested but scheduler.llm_command is empty. "
-            'Set it to a local CLI, e.g. ["ollama", "run", "llama3.1"].'
-        )
     try:
-        renderer = SubprocessLLM(
-            command,
-            timeout=config.int("scheduler.llm_timeout_seconds", 120, minimum=5, maximum=900),
-        )
+        renderer = build_renderer_from_config(config)
     except LLMError as exc:
         raise ConfigError(f"--llm requested but {exc}") from exc
-    if not renderer.exists():
+    if renderer is None:
+        raise ConfigError(
+            "--llm requested but no renderer is configured. "
+            'Set scheduler.llm_command or scheduler.llm_api.* in config.yaml.'
+        )
+    exists = getattr(renderer, "exists", None)
+    if callable(exists) and not exists():
         raise ConfigError(f"--llm requested but {renderer.describe()!r} is not on PATH")
     get_logger("cli").info("Using external renderer: %s", renderer.describe())
     return renderer
@@ -840,6 +818,14 @@ def cmd_draft(args: argparse.Namespace) -> int:
             "Run 'python main.py platforms' to see how to enable one."
         )
 
+    source_text = ""
+    try:
+        from sources import read_for_content
+
+        data, source_text = read_for_content(config, data, args.readme or args.source or "")
+    except Exception as exc:
+        log.warning("Could not read the source document: %s", exc)
+
     if args.prompt:
         out(
             render_prompt(
@@ -862,6 +848,7 @@ def cmd_draft(args: argparse.Namespace) -> int:
                 topic=args.topic or "",
                 platform=platforms[0] if platforms else "",
                 llm_renderer=renderer,
+                source_text=source_text,
             )
             item = ContentItem(
                 id=ContentStore.make_id(composed["title"], args.topic or ""),
@@ -1560,9 +1547,11 @@ def _add_content_parsers(sub: Any) -> None:
     p_draft.add_argument("--topic", help="narrow the article to one angle or topic")
     p_draft.add_argument("--platform", help=f"targets to attach (default: enabled ones). {PLATFORM_HELP}")
     p_draft.add_argument("--from-file", help="import a hand-written markdown file instead")
+    p_draft.add_argument("--readme", help="read README/source file to generate document from")
+    p_draft.add_argument("--source", help="read source file to generate document from")
     p_draft.add_argument("--show", action="store_true", help="print the article body")
     p_draft.add_argument("--prompt", action="store_true", help="print the LLM prompt and exit")
-    p_draft.add_argument("--llm", action="store_true", help="render via scheduler.llm_command")
+    p_draft.add_argument("--llm", action="store_true", help="render via configured LLM (subprocess or API)")
     p_draft.add_argument("--json", action="store_true")
     p_draft.set_defaults(func=cmd_draft)
 

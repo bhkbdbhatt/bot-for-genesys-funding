@@ -93,12 +93,13 @@ main.py            CLI parsing, command dispatch, composition root
   +-- content_store.py   syndication ledger: items, publications, counters
   +-- scheduler.py       outreach tick loop, quotas, cooldown, circuit breaker
   |     +-- prompt_engine.py   deterministic composer / prompt builder
-  |     |     +-- llm.py               optional subprocess renderer
+  |     |     +-- llm.py               optional subprocess or API renderer
   |     +-- senders/__init__.py        channel factory
   |           +-- senders/email_sender.py   SMTP
   |           +-- senders/forum_sender.py   API or manual outbox
   +-- promoter.py        syndication tick loop (mirrors scheduler.py)
   |     +-- content_engine.py    article composer + quality gate
+  |     |     +-- sources.py           README/brief -> content facts
   |     +-- publishers/__init__.py        publisher factory
   |           +-- publishers/base.py           contract, HTTP, manual hand-off
   |           +-- publishers/devto.py          Forem v1 REST
@@ -279,17 +280,33 @@ title, trims tags to the platform's limit, normalises the body to the platform's
 format and re-runs the gate against the *final* payload.
 
 Both engines share the same fail-safe contract: deterministic output by default,
-an optional `llm_renderer` (`llm.SubprocessLLM`), and a fallback to the
-deterministic composer on error, empty output, or output too short to be an
-article. `content_engine.compose()` does **not** pad itself to reach `min_words`;
+an optional `llm_renderer` (`llm.build_renderer_from_config` → `SubprocessLLM` or
+`ApiLLM`), and a fallback to the deterministic composer on error, empty output,
+or output too short to be an article. `content_engine.compose()` does **not** pad itself to reach `min_words`;
 if your config is too thin the gate says so, and the fix is more config or a real
 renderer.
 
 ### `llm.py` — optional external renderer
-A subprocess only: prompt on stdin, message on stdout. The bot never calls an LLM
-API itself. All failure modes (`TimeoutExpired`, `OSError`, non-zero exit,
-too-short output) surface as `LLMError`, which both engines treat as a cue to fall
-back.
+Two transports with one contract. `SubprocessLLM` runs a local command: prompt on
+stdin, message on stdout. `ApiLLM` posts to a chat-completions endpoint over
+`requests` (already a dependency) using the OpenAI, Anthropic or Ollama dialect;
+the key is read from the environment variable named in the config and never
+stored or logged. `build_renderer_from_config` picks the API transport when
+`scheduler.llm_api` names a `provider`/`endpoint`, otherwise the subprocess one,
+and returns `None` when neither is set, so the deterministic composer stays the
+default. All failure modes (`TimeoutExpired`, `OSError`, non-zero exit, HTTP
+error, missing key, non-JSON body, empty or too-short output) surface as
+`LLMError`, which both engines treat as a cue to fall back.
+
+### `sources.py` — reading a README/brief into the content config
+`sources.load_source_document` parses a local markdown file into
+`SourceDocument` (title, summary, feature bullets, links) with the standard
+library only. `merge_source_into_content` fills *missing* plugin facts so
+explicit config always wins, and `read_for_content` is the shared seam used by
+`main.cmd_draft` and the web wizard: it returns `(content, source_text)` and is
+fail-soft, so a missing or unreadable file degrades to config-only. The raw text
+is passed to the renderer as a `SOURCE DOCUMENT` block and never re-parsed as a
+template.
 
 ### `scheduler.py` / `promoter.py` — the two tick loops
 Structurally identical on purpose: pick a batch, check the circuit breaker,

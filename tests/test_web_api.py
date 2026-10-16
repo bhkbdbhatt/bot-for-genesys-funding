@@ -255,6 +255,33 @@ def test_item_detail_and_edit(signed_in_client, content_state):
     assert status == 400
 
 
+def test_draft_from_a_readme_file(signed_in_client, server):
+    _, boot = signed_in_client.get("/api/bootstrap")
+    pid = boot["profiles"][0]["id"]
+    readme = server["tmp"] / "source-readme.md"
+    readme.write_text(
+        "# Widget Forge\n\n"
+        "A short summary of what Widget Forge does, in one sentence.\n\n"
+        "## Features\n\n"
+        "- Parses arbitrary widget definitions\n"
+        "- Emits typed artefacts for six languages\n",
+        encoding="utf-8",
+    )
+    status, body = signed_in_client.post(
+        f"/api/profiles/{pid}/content/draft",
+        {
+            "title": "Widget Forge in practice",
+            "topic": "source",
+            "platforms": ["devdojo"],
+            "llm": False,
+            "readme": str(readme),
+        },
+    )
+    assert status == 200, f"{status} {body}"
+    assert body["renderer"] == "deterministic"
+    assert "Parses arbitrary widget definitions" in body["item"]["body_markdown"]
+
+
 def test_approval_gate(signed_in_client, content_state):
     pid, item_id = content_state["pid"], content_state["item_id"]
     status, body = signed_in_client.get(f"/api/profiles/{pid}/content")

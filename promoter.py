@@ -202,12 +202,19 @@ class Promoter:
     ) -> ContentItem:
         """Build a new article from config and return it unsaved."""
         data = self.content_data()
+        try:
+            from sources import read_for_content
+
+            data, source_text = read_for_content(self.config, data)
+        except Exception:  # noqa: BLE001 - a missing source must never abort a batch
+            source_text = ""
         draft = generate(
             data,
             title=title,
             topic=topic,
             platform=(platforms or [""])[0],
             llm_renderer=self.llm_renderer,
+            source_text=source_text,
         )
         targets = [pid for pid in (platforms or []) if pid in PLATFORM_IDS]
         item = ContentItem(

@@ -362,6 +362,28 @@ class Config:
                 if any(char in token for char in "\r\n"):
                     errors.append(f"scheduler.llm_command[{index}] must not contain newlines")
 
+        llm_api = self.section("scheduler.llm_api")
+        if llm_api:
+            endpoint = _as_str(llm_api.get("endpoint"))
+            if endpoint and not is_valid_url(endpoint):
+                errors.append("scheduler.llm_api.endpoint must be an http(s) URL")
+            key_env = _as_str(llm_api.get("api_key_env"))
+            if any(char in key_env for char in "\r\n"):
+                errors.append("scheduler.llm_api.api_key_env must not contain newlines")
+            provider = _as_str(llm_api.get("provider")).lower()
+            known = ("", "openai", "anthropic", "ollama", "openrouter", "mistral",
+                     "groq", "together", "perplexity", "xai", "deepseek")
+            if provider not in known:
+                errors.append(
+                    f"scheduler.llm_api.provider must be one of "
+                    f"{', '.join(known[1:])} (got {provider!r})"
+                )
+            if key_env and not resolve_secret(key_env):
+                warnings.append(
+                    f"environment variable {key_env!r} (scheduler.llm_api.api_key_env) is not "
+                    "set - LLM API rendering will fall back to the built-in composer"
+                )
+
         publishing = self.section("publishing")
         if publishing:
             if self.int("publishing.interval_seconds", 10800, minimum=60) < 60:
