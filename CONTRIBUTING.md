@@ -87,3 +87,35 @@ source, so keep the record shape stable.
 Open a GitHub issue with the version, what you expected, what happened, and the
 smallest reproduction. For anything that looks security-sensitive, follow
 [SECURITY.md](SECURITY.md) instead of opening a public issue.
+
+## Releasing to PyPI
+
+Publishing is automated. `.github/workflows/publish.yml` runs on a published
+GitHub Release: it re-runs `ruff` and `pytest`, builds the sdist and wheel,
+checks them with `twine check --strict`, verifies the release tag matches
+`project.version` in `pyproject.toml`, and uploads with **PyPI trusted
+publishing** - no API tokens are stored in GitHub.
+
+One-time maintainer setup: on pypi.org, open *Account settings → Publishing*
+and add a *pending publisher* for project `genesys-plugin-sponsor-bot`, owner
+`bhkbdbhatt`, repository `bot-for-genesys-funding`, workflow `publish.yml`,
+environment `pypi` (create the `pypi` environment in the repository settings).
+
+Per release:
+
+1. Move the `[Unreleased]` notes in `CHANGELOG.md` under a new version
+   heading with the date.
+2. Bump `version` in `pyproject.toml` - it is the single source of truth and
+   the workflow rejects a tag that disagrees with it.
+3. Run the checks: `pytest -q`, `ruff check .`, `main.py platforms`.
+4. Optionally rehearse locally:
+   `python -m build && twine check --strict dist/*`, or upload to TestPyPI
+   first with `twine upload --repository testpypi dist/*` (API token from
+   test.pypi.org) and `pip install --index-url https://test.pypi.org/simple/
+   genesys-plugin-sponsor-bot`.
+5. Commit, tag `vX.Y.Z`, and create a GitHub Release for that tag - the
+   workflow publishes it.
+
+PyPI rejects re-uploading an existing version, so a broken release needs a
+new patch version, never a re-run of the same tag. `workflow_dispatch` on the
+publish workflow can re-run the build for an unpublished version.

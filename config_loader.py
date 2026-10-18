@@ -122,9 +122,13 @@ class Config:
                 return cls._read(candidate, create_from_example=create_from_example)
 
         # Nothing on disk yet: bootstrap from the example shipped beside this
-        # module, not from whatever directory the user happened to be in.
+        # module (a source checkout). When installed from a wheel there is no
+        # example beside the code, so aim at the current directory instead -
+        # site-packages is not the place for a user config.
         package_dir = Path(__file__).resolve().parent
-        return cls._read(package_dir / CONFIG_FILENAME, create_from_example=create_from_example)
+        if (package_dir / EXAMPLE_FILENAME).is_file():
+            return cls._read(package_dir / CONFIG_FILENAME, create_from_example=create_from_example)
+        return cls._read(Path.cwd() / CONFIG_FILENAME, create_from_example=create_from_example)
 
     @staticmethod
     def _search_dirs() -> List[Path]:
@@ -146,8 +150,11 @@ class Config:
             if not example.is_file():
                 raise ConfigError(
                     f"Config not found: {target}\n"
-                    f"Expected a {CONFIG_FILENAME} beside {EXAMPLE_FILENAME}; "
-                    f"the example documents every supported key."
+                    f"No {EXAMPLE_FILENAME} was found to copy, so {CONFIG_FILENAME} cannot be "
+                    f"created automatically. Copy the example to {CONFIG_FILENAME} in the "
+                    f"current directory and edit it; it documents every supported key:\n"
+                    f"https://github.com/bhkbdbhatt/bot-for-genesys-funding/blob/master/"
+                    f"{EXAMPLE_FILENAME}"
                 )
             if not create_from_example:
                 raise ConfigError(f"Config not found: {target}")

@@ -37,6 +37,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   chat-API renderer (`openai`, `anthropic`, `ollama`, and other OpenAI-compatible
   providers) alongside `scheduler.llm_command`, with the same fail-soft fallback
   to the deterministic composer.
+- **PyPI packaging:** complete `pyproject.toml` metadata (classifiers, keywords,
+  project URLs, SPDX licence, `sources` module), a `MANIFEST.in` for the sdist,
+  `webapp/static` shipped in the wheel so the wizard works from a PyPI
+  install, and `.github/workflows/publish.yml` which builds, verifies and
+  uploads to PyPI with trusted publishing on every GitHub Release. A wheel
+  install without a config now points at the current directory and the
+  example config instead of the site-packages tree.
 - **Docs and hygiene:** rewritten `SECURITY.md`, this `CHANGELOG.md`,
   `CONTRIBUTING.md`, `AGENTS.md`, and `README.md` / `ARCHITECTURE.md` updates.
 

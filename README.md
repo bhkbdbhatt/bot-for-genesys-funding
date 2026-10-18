@@ -32,6 +32,25 @@ profiles, so it works for projects beyond Genesys.
 - Python 3.10+ (developed and tested on 3.12)
 - `pip install -r requirements.txt`
 
+## Installation
+
+From [PyPI](https://pypi.org/project/genesys-plugin-sponsor-bot/):
+
+```powershell
+pip install genesys-plugin-sponsor-bot
+```
+
+This installs the `genesys-sponsor-bot` console command - every
+`python main.py ...` command below works as `genesys-sponsor-bot ...` - plus
+the two runtime dependencies. Running it from a directory without a
+`config.yaml` prints the location of `config.example.yaml` in the repository;
+copy it to `config.yaml` in the directory you run from (it is searched first)
+and edit it. You can also install straight from the repository:
+
+```powershell
+pip install git+https://github.com/bhkbdbhatt/bot-for-genesys-funding.git
+```
+
 ## Quick start
 
 ```powershell

@@ -1,0 +1,21 @@
+include AGENTS.md
+include ARCHITECTURE.md
+include CHANGELOG.md
+include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include LICENSE
+include README.md
+include SECURITY.md
+include config.example.yaml
+include requirements.txt
+recursive-include webapp/static *
+recursive-include tests *
+prune profiles
+exclude bot.log
+exclude ui.log
+global-exclude __pycache__/*.py[cod]
+global-exclude *.log
+global-exclude config.yaml
+global-exclude content.json
+global-exclude sponsors.json
+global-exclude users.json

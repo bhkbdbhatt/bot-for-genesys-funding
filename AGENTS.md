@@ -30,6 +30,7 @@ Always run these on the `.venv` interpreter and from the repo root.
 | Lint | `.\.venv\Scripts\python.exe -m ruff check .` |
 | Run (smoke) | `.\.venv\Scripts\python.exe main.py platforms` |
 | Run (dry, safe) | `.\.venv\Scripts\python.exe main.py run --once --dry-run` |
+| Package | `.\.venv\Scripts\python.exe -m build` then `.\.venv\Scripts\python.exe -m twine check dist\*` |
 | Self-tests | `.\.venv\Scripts\python.exe _selftest.py` and `_spatest.py` and `_webtest.py` |
 | JS probe | `node tests\driver.js` |
 

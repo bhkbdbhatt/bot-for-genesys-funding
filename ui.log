@@ -141,3 +141,81 @@
 2026-10-16 12:00:32 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
 2026-10-16 12:00:32 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
 2026-10-16 12:00:39 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:15:35 | WARNING  | auth               | OUTREACH_AUTH_SECRET is not set. Falling back to the key stored inside D:\plugin-genesys\bot-for-genesys-funding\users.json, which protects the file no better than the filesystem already does. Set it to a long random string to survive moving or backing up the file.
+2026-10-16 13:16:10 | INFO     | webapp             | Signed in bhk.bdbhatt@gmail.com (admin)
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:11 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | INFO     | content-store      | Refreshed content item genesys-cloud-community-plugin
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:28 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:16:37 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | INFO     | content-store      | Content status sex-is-good-but-more-sex-give-less-energy: draft -> failed
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:37 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | INFO     | content-store      | Removed content item sex-is-good-but-more-sex-give-less-energy
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:44 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:47 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for coderlegion: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for devto: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for hashnode: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for medium: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for webhook: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for ghost: no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:48 | WARNING  | content-engine     | Content gate rejected a draft for bluesky: body is 4590 bytes, over the 3000 byte limit; no author disclosure - say plainly that you maintain the project
+2026-10-16 13:17:51 | INFO     | content-store      | Removed content item genesys-cloud-community-plugin
+2026-10-16 13:24:32 | INFO     | state              | Rate counters reset for 2026-10-16
+2026-10-16 13:24:32 | INFO     | state              | Rate counters reset for 2026-10-16
+2026-10-16 13:25:28 | INFO     | discovery          | Scanning topic:sewline on github
+2026-10-16 13:25:29 | INFO     | discovery          | topic:sewline page 1 -> 0 repos (+0 total seen, 0 indexed)
+2026-10-16 13:25:29 | INFO     | discovery          | Aggregated 0 repos across 0 owners
+2026-10-16 13:25:29 | INFO     | discovery          | Discovery complete: 0/0 owners passed the filter (org>=5 repos, individual>=3 genesys repos)
+2026-10-16 13:25:29 | INFO     | state              | Rate counters reset for 2026-10-16
+2026-10-16 13:26:17 | WARNING  | scheduler          | Not deliverable to GenesysCloudBlueprints: no valid email on file for 'GenesysCloudBlueprints'
+2026-10-16 13:26:17 | WARNING  | scheduler          | Not deliverable to GenesysCloudDevOps: no valid email on file for 'GenesysCloudDevOps'
+2026-10-16 13:26:17 | WARNING  | scheduler          | Not deliverable to MakingChatbots: no valid email on file for 'MakingChatbots'
+2026-10-16 13:26:17 | WARNING  | scheduler          | Not deliverable to ovotech: no valid email on file for 'ovotech'
+2026-10-16 13:26:17 | WARNING  | scheduler          | Not deliverable to splunk: no valid email on file for 'splunk'
+2026-10-16 13:26:17 | INFO     | scheduler          | Tick end | attempted=0 sent=0 failed=0 skipped=5 usage={'email': {'used': 0, 'limit': 15, 'remaining': 15}, 'forum': {'used': 0, 'limit': 3, 'remaining': 3}}

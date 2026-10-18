@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,24 +7,56 @@ name = "genesys-plugin-sponsor-bot"
 version = "1.0.0"
 description = "Fundraising / developer-relations bot: GitHub sponsor outreach and content syndication for promoting an open-source Genesys Cloud plugin."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Bhargav Bhatt" }]
 requires-python = ">=3.10"
+keywords = [
+    "genesys",
+    "sponsor",
+    "fundraising",
+    "outreach",
+    "content-syndication",
+    "developer-relations",
+    "github",
+    "automation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Email",
+    "Topic :: Utilities",
+]
 dependencies = [
     "pyyaml>=6.0",
     "requests>=2.31",
 ]
 
+[project.urls]
+Homepage = "https://github.com/bhkbdbhatt/bot-for-genesys-funding"
+Repository = "https://github.com/bhkbdbhatt/bot-for-genesys-funding"
+Issues = "https://github.com/bhkbdbhatt/bot-for-genesys-funding/issues"
+Changelog = "https://github.com/bhkbdbhatt/bot-for-genesys-funding/blob/master/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",
     "ruff>=0.4",
+    "build>=1.2",
+    "twine>=5",
 ]
 
 [project.scripts]
 genesys-sponsor-bot = "main:main"
 
 [tool.setuptools]
+include-package-data = true
 py-modules = [
     "main",
     "config_loader",
@@ -40,10 +72,14 @@ py-modules = [
     "scheduler",
     "promoter",
     "logging_setup",
+    "sources",
 ]
 
 [tool.setuptools.packages.find]
 include = ["senders*", "publishers*", "webapp*"]
+
+[tool.setuptools.package-data]
+webapp = ["static/*"]
 
 [tool.ruff]
 line-length = 110
