@@ -72,5 +72,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   DEV, Hashnode, Medium, WordPress, CoderLegion, DevDojo and a generic webhook,
   with an optional standard-library local web wizard.
 
-[Unreleased]: https://github.com/bhkbdbhatt/bot-for-genesys-funding/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/bhkbdbhatt/bot-for-genesys-funding/releases/tag/v1.0.0
+[Unreleased]: https://github.com/bhkbdbhatt/bot-for-opensource-funding/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bhkbdbhatt/bot-for-opensource-funding/releases/tag/v1.0.0

@@ -253,7 +253,7 @@ class ApiLLM:
 
         headers: Dict[str, str] = {
             "Content-Type": "application/json",
-            "User-Agent": "bot-for-genesys-funding/llm",
+            "User-Agent": "bot-for-opensource-funding/llm",
         }
         payload: Dict[str, Any]
         if self.provider == "anthropic":

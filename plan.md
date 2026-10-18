@@ -1,6 +1,6 @@
 # plan.md — New Features & Quality Roadmap
 
-Principal-architecture review outcome for `bot-for-genesys-funding`
+Principal-architecture review outcome for `bot-for-opensource-funding`
 (`GenesysPluginSponsorBot`). Approved scope: all six areas below, executed in
 order, **no commits** (everything left staged/unstaged for maintainer review).
 

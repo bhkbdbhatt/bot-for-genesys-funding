@@ -153,7 +153,7 @@ class Config:
                     f"No {EXAMPLE_FILENAME} was found to copy, so {CONFIG_FILENAME} cannot be "
                     f"created automatically. Copy the example to {CONFIG_FILENAME} in the "
                     f"current directory and edit it; it documents every supported key:\n"
-                    f"https://github.com/bhkbdbhatt/bot-for-genesys-funding/blob/master/"
+                    f"https://github.com/bhkbdbhatt/bot-for-opensource-funding/blob/master/"
                     f"{EXAMPLE_FILENAME}"
                 )
             if not create_from_example:

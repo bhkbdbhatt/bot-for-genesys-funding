@@ -47,7 +47,7 @@ def test_missing_config_points_at_the_current_directory(tmp_path, monkeypatch):
     message = str(excinfo.value)
     assert str(tmp_path / "config.yaml") in message
     assert "config.example.yaml" in message
-    assert "https://github.com/bhkbdbhatt/bot-for-genesys-funding" in message
+    assert "https://github.com/bhkbdbhatt/bot-for-opensource-funding" in message
     assert not (tmp_path / "config.yaml").exists()
     assert not (package_dir / "config.yaml").exists()
 

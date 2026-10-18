@@ -9,8 +9,8 @@ run unattended and obvious to the next reader.**
 Python 3.10+ is required. Runtime dependencies are only `pyyaml` and `requests`.
 
 ```powershell
-git clone https://github.com/bhkbdbhatt/bot-for-genesys-funding.git
-cd bot-for-genesys-funding
+git clone https://github.com/bhkbdbhatt/bot-for-opensource-funding.git
+cd bot-for-opensource-funding
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
@@ -98,7 +98,7 @@ publishing** - no API tokens are stored in GitHub.
 
 One-time maintainer setup: on pypi.org, open *Account settings → Publishing*
 and add a *pending publisher* for project `genesys-plugin-sponsor-bot`, owner
-`bhkbdbhatt`, repository `bot-for-genesys-funding`, workflow `publish.yml`,
+`bhkbdbhatt`, repository `bot-for-opensource-funding`, workflow `publish.yml`,
 environment `pypi` (create the `pypi` environment in the repository settings).
 
 Per release:

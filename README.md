@@ -48,7 +48,7 @@ copy it to `config.yaml` in the directory you run from (it is searched first)
 and edit it. You can also install straight from the repository:
 
 ```powershell
-pip install git+https://github.com/bhkbdbhatt/bot-for-genesys-funding.git
+pip install git+https://github.com/bhkbdbhatt/bot-for-opensource-funding.git
 ```
 
 ## Quick start
