@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bot-for-opensource-funding"
 version = "1.0.0"
-description = "Fundraising / developer-relations bot: GitHub sponsor outreach and content syndication for promoting an open-source Genesys Cloud plugin."
+description = "Fundraising / developer-relations bot: GitHub sponsor outreach and content syndication for promoting an open-source projects."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
