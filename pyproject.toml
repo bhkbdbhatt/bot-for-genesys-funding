@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "genesys-plugin-sponsor-bot"
+name = "bot-for-opensource-funding"
 version = "1.0.0"
 description = "Fundraising / developer-relations bot: GitHub sponsor outreach and content syndication for promoting an open-source Genesys Cloud plugin."
 readme = "README.md"
@@ -39,10 +39,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bhkbdbhatt/bot-for-genesys-funding"
-Repository = "https://github.com/bhkbdbhatt/bot-for-genesys-funding"
-Issues = "https://github.com/bhkbdbhatt/bot-for-genesys-funding/issues"
-Changelog = "https://github.com/bhkbdbhatt/bot-for-genesys-funding/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/bhkbdbhatt/bot-for-opensource-funding"
+Repository = "https://github.com/bhkbdbhatt/bot-for-opensource-funding"
+Issues = "https://github.com/bhkbdbhatt/bot-for-opensource-funding/issues"
+Changelog = "https://github.com/bhkbdbhatt/bot-for-opensource-funding/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
