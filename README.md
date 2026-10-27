@@ -1,4 +1,4 @@
-# Bot For Opensource Funding
+# Bot For Opensource Funding and Content Syndication
 
 A dependency-light Python tool that promotes one open-source project two ways.
 
