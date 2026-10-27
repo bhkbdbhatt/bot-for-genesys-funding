@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot For OpenSource Funding</title>
+  <meta name="description" content="Promote and fund open source projects with automated sponsor outreach and content syndication.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <nav class="nav container">
+      <div class="nav__brand">
+        <span class="nav__logo">OSS Fund Bot</span>
+      </div>
+      <button class="nav__toggle" id="nav-toggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="nav__menu" id="nav-menu">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#funding">Funding</a></li>
+        <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero__content">
+        <h1 class="hero__title">Promote &amp; Fund Your Open Source Project</h1>
+        <p class="hero__subtitle">Automate sponsor outreach and content syndication to grow visibility and secure funding for your open source work.</p>
+        <div class="hero__actions">
+          <a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding" class="btn btn--primary" target="_blank" rel="noopener">View on GitHub</a>
+          <a href="#funding" class="btn btn--secondary">Support the Project</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <div class="container">
+        <h2 class="section__title">Powerful Features</h2>
+        <p class="section__subtitle">Everything you need to promote and fund your open source project</p>
+        <div class="features__grid">
+          <article class="feature__card">
+            <div class="feature__icon">🤝</div>
+            <h3 class="feature__title">Sponsor Outreach</h3>
+            <p class="feature__description">Discover potential sponsors on GitHub, craft personalized messages, and reach out via email or forums with rate limiting and cooldowns.</p>
+          </article>
+          <article class="feature__card">
+            <div class="feature__icon">📝</div>
+            <h3 class="feature__title">Content Syndication</h3>
+            <p class="feature__description">Write once, publish everywhere. Syndicate articles to DEV, Hashnode, Medium, Ghost, Bluesky, and more with automated publishing.</p>
+          </article>
+          <article class="feature__card">
+            <div class="feature__icon">🛡️</div>
+            <h3 class="feature__title">Ethical &amp; Compliant</h3>
+            <p class="feature__description">Built-in quality gates, disclosure requirements, rate limits, and anti-spam measures to maintain community trust.</p>
+          </article>
+          <article class="feature__card">
+            <div class="feature__icon">⚡</div>
+            <h3 class="feature__title">Dependency-Light</h3>
+            <p class="feature__description">Only 2 runtime dependencies (PyYAML, requests). Runs anywhere with Python 3.10+. Optional local web UI with zero extra deps.</p>
+          </article>
+          <article class="feature__card">
+            <div class="feature__icon">🔒</div>
+            <h3 class="feature__title">Secure by Design</h3>
+            <p class="feature__description">Secrets from environment variables only. Atomic writes, crash-safe persistence, and secure local web UI with 2FA support.</p>
+          </article>
+          <article class="feature__card">
+            <div class="feature__icon">🎯</div>
+            <h3 class="feature__title">Campaign Management</h3>
+            <p class="feature__description">Manage multiple projects with isolated profiles. Track outreach status, publication history, and analytics in one place.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="how-it-works">
+      <div class="container">
+        <h2 class="section__title">How It Works</h2>
+        <p class="section__subtitle">Two powerful pipelines working together</p>
+        <div class="pipelines">
+          <div class="pipeline">
+            <h3 class="pipeline__title">Outreach Pipeline</h3>
+            <ol class="pipeline__steps">
+              <li><strong>Discover</strong> - Find potential sponsors on GitHub/GitLab by topics</li>
+              <li><strong>Track</strong> - Manage prospects with status and cooldowns</li>
+              <li><strong>Generate</strong> - Craft personalized messages with AI or templates</li>
+              <li><strong>Send</strong> - Reach out via email or forums at safe rates</li>
+            </ol>
+          </div>
+          <div class="pipeline">
+            <h3 class="pipeline__title">Syndication Pipeline</h3>
+            <ol class="pipeline__steps">
+              <li><strong>Draft</strong> - Write articles with quality gates and disclosure</li>
+              <li><strong>Approve</strong> - Human review before publishing</li>
+              <li><strong>Publish</strong> - Auto-post to APIs or get paste-ready files</li>
+              <li><strong>Track</strong> - Monitor live URLs across all platforms</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="funding" class="funding">
+      <div class="container">
+        <h2 class="section__title">Support This Project</h2>
+        <p class="section__subtitle">Help us continue building tools for open source sustainability</p>
+        <div class="funding__content">
+          <p class="funding__text">This tool is free and open source, built to help maintainers secure funding for their work. Your support helps us maintain, improve, and add new features.</p>
+          <div class="funding__options">
+            <a href="https://github.com/sponsors/bhkbdbhatt" class="funding__card" target="_blank" rel="noopener">
+              <div class="funding__icon">💚</div>
+              <h3>GitHub Sponsors</h3>
+              <p>Support monthly through GitHub Sponsors</p>
+            </a>
+            <a href="https://ko-fi.com/" class="funding__card" target="_blank" rel="noopener">
+              <div class="funding__icon">☕</div>
+              <h3>Ko-fi</h3>
+              <p>Buy us a coffee or make a one-time donation</p>
+            </a>
+            <a href="https://opencollective.com/" class="funding__card" target="_blank" rel="noopener">
+              <div class="funding__icon">🌟</div>
+              <h3>OpenCollective</h3>
+              <p>Transparent funding for the community</p>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container cta__content">
+        <h2 class="cta__title">Ready to grow your project?</h2>
+        <p class="cta__subtitle">Get started in minutes with the local web wizard or CLI</p>
+        <div class="cta__actions">
+          <a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding#quick-start" class="btn btn--primary btn--large" target="_blank" rel="noopener">Quick Start Guide</a>
+          <a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding" class="btn btn--secondary btn--large" target="_blank" rel="noopener">Download &amp; Install</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__content">
+      <div class="footer__brand">
+        <span class="footer__logo">OSS Fund Bot</span>
+        <p class="footer__description">A dependency-light tool for promoting open source projects and finding sponsors.</p>
+      </div>
+      <div class="footer__links">
+        <div class="footer__section">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding/blob/master/README.md" target="_blank" rel="noopener">Documentation</a></li>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding/blob/master/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a></li>
+          </ul>
+        </div>
+        <div class="footer__section">
+          <h4>Community</h4>
+          <ul>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding/issues" target="_blank" rel="noopener">Issues</a></li>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding/discussions" target="_blank" rel="noopener">Discussions</a></li>
+            <li><a href="https://github.com/bhkbdbhatt/bot-for-opensource-funding/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="container">
+        <p>&copy; 2026 Bot For OpenSource Funding. Open source under MIT License.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
